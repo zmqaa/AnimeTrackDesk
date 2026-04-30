@@ -1,0 +1,901 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root,
+html[data-theme='obsidian'] {
+  --background: #050608;
+  --foreground: #f2f4f8;
+  --card: #0d1015;
+  --card-foreground: #f2f4f8;
+  --popover: #10131a;
+  --popover-foreground: #f2f4f8;
+  --primary: #bcc7da;
+  --primary-foreground: #090b10;
+  --secondary: #141820;
+  --secondary-foreground: #eef2f7;
+  --muted: #12161d;
+  --muted-foreground: #99a3b4;
+  --accent: #171b24;
+  --accent-foreground: #f2f4f8;
+  --destructive: #7f1d1d;
+  --destructive-foreground: #fafafa;
+  --border: #202632;
+  --input: #1c222d;
+  --ring: #bcc7da;
+  --radius: 0.75rem;
+  --chart-1: #bcc7da;
+  --chart-2: #8795ae;
+  --chart-3: #deb36d;
+  --chart-4: #6f7f99;
+  --chart-5: #d9dee8;
+  --pulse-glow-rgb: 188, 199, 218;
+  --page-background:
+    radial-gradient(circle at 18% 0%, rgba(188, 199, 218, 0.12), transparent 30%),
+    radial-gradient(circle at 100% 8%, rgba(118, 131, 158, 0.12), transparent 26%),
+    radial-gradient(circle at 82% 100%, rgba(222, 179, 109, 0.07), transparent 28%),
+    linear-gradient(180deg, #050608 0%, #090b10 42%, #050608 100%);
+  --glass-panel-bg: linear-gradient(180deg, rgba(11, 13, 18, 0.96), rgba(12, 15, 20, 0.8));
+  --glass-panel-hover-bg: linear-gradient(180deg, rgba(13, 16, 21, 0.98), rgba(14, 18, 24, 0.88));
+  --glass-panel-border: rgba(110, 122, 145, 0.16);
+  --glass-panel-hover-border: rgba(188, 199, 218, 0.22);
+  --glass-panel-hover-glow: rgba(188, 199, 218, 0.06);
+  --glass-panel-strong-bg: linear-gradient(180deg, rgba(8, 10, 14, 0.98), rgba(10, 13, 18, 0.9));
+  --glass-panel-strong-border: rgba(116, 129, 152, 0.18);
+  --surface-card-bg: linear-gradient(180deg, rgba(17, 21, 28, 0.8), rgba(10, 12, 17, 0.58));
+  --surface-card-border: rgba(120, 132, 155, 0.18);
+  --surface-card-muted-bg: linear-gradient(180deg, rgba(15, 18, 24, 0.68), rgba(9, 11, 16, 0.45));
+  --surface-card-muted-border: rgba(110, 121, 142, 0.15);
+  --surface-pill-bg: rgba(15, 19, 26, 0.58);
+  --surface-pill-border: rgba(120, 132, 155, 0.16);
+  --surface-input-bg: rgba(8, 11, 16, 0.84);
+  --surface-input-border: rgba(119, 131, 154, 0.18);
+  --surface-highlight-glow: rgba(188, 199, 218, 0.05);
+  --route-loading-track-bg: linear-gradient(90deg, rgba(188, 199, 218, 0.08), rgba(127, 144, 175, 0.08));
+  --route-loading-bar-bg: linear-gradient(90deg, rgba(188, 199, 218, 0.92), rgba(127, 144, 175, 0.92));
+  --route-loading-bar-glow: rgba(188, 199, 218, 0.32);
+  --selection-background: rgba(188, 199, 218, 0.28);
+  --sidebar-aura: radial-gradient(circle at top left, rgba(188, 199, 218, 0.1), transparent 32%), radial-gradient(circle at bottom right, rgba(118, 131, 158, 0.08), transparent 28%);
+  --dashboard-aura: radial-gradient(circle at 5% 5%, rgba(188, 199, 218, 0.12), transparent 32%), radial-gradient(circle at 100% 0%, rgba(118, 131, 158, 0.12), transparent 34%), radial-gradient(circle at 80% 100%, rgba(222, 179, 109, 0.08), transparent 30%);
+  --atlas-aura: radial-gradient(circle at top left, rgba(188, 199, 218, 0.08), transparent 30%), radial-gradient(circle at bottom right, rgba(118, 131, 158, 0.08), transparent 26%);
+  --atlas-hero-aura: radial-gradient(circle at top, rgba(255, 255, 255, 0.05), transparent 35%), linear-gradient(135deg, rgba(188, 199, 218, 0.1), transparent 42%, rgba(118, 131, 158, 0.08));
+  --detail-aura: radial-gradient(circle at top left, rgba(188, 199, 218, 0.14), transparent 30%), radial-gradient(circle at top right, rgba(118, 131, 158, 0.14), transparent 25%), linear-gradient(180deg, rgba(8, 10, 15, 0.82), rgba(5, 7, 11, 0.98));
+  --accent-soft-bg: rgba(188, 199, 218, 0.1);
+  --accent-soft-bg-strong: rgba(188, 199, 218, 0.12);
+  --accent-soft-bg-hover: rgba(188, 199, 218, 0.14);
+  --accent-soft-border: rgba(188, 199, 218, 0.18);
+  --accent-soft-border-strong: rgba(226, 232, 240, 0.28);
+  --accent-soft-text: rgba(248, 250, 252, 0.95);
+  --accent-soft-text-muted: rgba(226, 232, 240, 0.72);
+  --accent-shadow: rgba(148, 163, 184, 0.12);
+  --accent-rail-glow: rgba(188, 199, 218, 0.42);
+  --secondary-soft-bg: rgba(125, 143, 175, 0.12);
+  --secondary-soft-bg-hover: rgba(125, 143, 175, 0.16);
+  --secondary-soft-border: rgba(125, 143, 175, 0.22);
+  --secondary-soft-border-strong: rgba(165, 180, 252, 0.28);
+  --secondary-soft-text: rgba(224, 231, 255, 0.95);
+  --warm-soft-bg: rgba(222, 179, 109, 0.12);
+  --warm-soft-bg-hover: rgba(222, 179, 109, 0.16);
+  --warm-soft-border: rgba(222, 179, 109, 0.22);
+  --warm-soft-text: rgba(254, 243, 199, 0.95);
+  --accent-solid-bg: #bcc7da;
+  --accent-solid-bg-hover: #d9dee8;
+  --accent-solid-text: #090b10;
+  --focus-border: rgba(188, 199, 218, 0.4);
+  --focus-ring: rgba(188, 199, 218, 0.18);
+  --accent-gradient: linear-gradient(90deg, rgba(188, 199, 218, 0.96), rgba(129, 140, 248, 0.92));
+  --spectrum-gradient: linear-gradient(90deg, rgba(188, 199, 218, 0.96), rgba(125, 143, 175, 0.94), rgba(222, 179, 109, 0.92));
+  --status-watching-bg: rgba(222, 179, 109, 0.12);
+  --status-watching-border: rgba(222, 179, 109, 0.22);
+  --status-watching-text: rgba(254, 243, 199, 0.95);
+  --status-completed-bg: rgba(125, 143, 175, 0.12);
+  --status-completed-border: rgba(125, 143, 175, 0.22);
+  --status-completed-text: rgba(224, 231, 255, 0.95);
+  --theme-dot: #bcc7da;
+}
+
+html[data-theme='verdant'] {
+  --background: #07110f;
+  --foreground: #f5f7f4;
+  --card: #0f1a18;
+  --card-foreground: #f5f7f4;
+  --popover: #0f1a18;
+  --popover-foreground: #f5f7f4;
+  --primary: #56d39c;
+  --primary-foreground: #ffffff;
+  --secondary: #162421;
+  --secondary-foreground: #f5f7f4;
+  --muted: #14201d;
+  --muted-foreground: #a7cdbd;
+  --accent: #152824;
+  --accent-foreground: #f5f7f4;
+  --destructive: #7f1d1d;
+  --destructive-foreground: #fafafa;
+  --border: #17312a;
+  --input: #17312a;
+  --ring: #56d39c;
+  --radius: 0.75rem;
+  --chart-1: #56d39c;
+  --chart-2: #5dd6f2;
+  --chart-3: #f4bf62;
+  --chart-4: #7dd3a4;
+  --chart-5: #8da6ff;
+  --pulse-glow-rgb: 34, 197, 94;
+  --page-background:
+    radial-gradient(circle at 20% 0%, rgba(86, 211, 156, 0.18), transparent 32%),
+    radial-gradient(circle at 100% 10%, rgba(93, 214, 242, 0.12), transparent 28%),
+    radial-gradient(circle at 80% 100%, rgba(244, 191, 98, 0.08), transparent 30%),
+    linear-gradient(180deg, #07110f 0%, #091513 38%, #07110f 100%);
+  --glass-panel-bg: linear-gradient(180deg, rgba(10, 18, 16, 0.94), rgba(12, 18, 18, 0.78));
+  --glass-panel-hover-bg: linear-gradient(180deg, rgba(12, 22, 19, 0.96), rgba(14, 22, 21, 0.84));
+  --glass-panel-border: rgba(102, 132, 121, 0.16);
+  --glass-panel-hover-border: rgba(86, 211, 156, 0.28);
+  --glass-panel-hover-glow: rgba(86, 211, 156, 0.08);
+  --glass-panel-strong-bg: linear-gradient(180deg, rgba(9, 17, 15, 0.98), rgba(10, 17, 17, 0.88));
+  --glass-panel-strong-border: rgba(108, 141, 128, 0.18);
+  --surface-card-bg: linear-gradient(180deg, rgba(18, 29, 26, 0.74), rgba(10, 17, 15, 0.52));
+  --surface-card-border: rgba(112, 145, 132, 0.18);
+  --surface-card-muted-bg: linear-gradient(180deg, rgba(15, 24, 22, 0.62), rgba(9, 15, 14, 0.42));
+  --surface-card-muted-border: rgba(104, 134, 123, 0.15);
+  --surface-pill-bg: rgba(14, 22, 20, 0.58);
+  --surface-pill-border: rgba(112, 142, 130, 0.16);
+  --surface-input-bg: rgba(8, 14, 13, 0.82);
+  --surface-input-border: rgba(110, 141, 129, 0.18);
+  --surface-highlight-glow: rgba(86, 211, 156, 0.05);
+  --route-loading-track-bg: linear-gradient(90deg, rgba(86, 211, 156, 0.08), rgba(93, 214, 242, 0.06));
+  --route-loading-bar-bg: linear-gradient(90deg, rgba(86, 211, 156, 0.92), rgba(93, 214, 242, 0.92));
+  --route-loading-bar-glow: rgba(86, 211, 156, 0.45);
+  --selection-background: rgba(86, 211, 156, 0.28);
+  --sidebar-aura: radial-gradient(circle at top left, rgba(86, 211, 156, 0.12), transparent 32%), radial-gradient(circle at bottom right, rgba(93, 214, 242, 0.1), transparent 28%);
+  --dashboard-aura: radial-gradient(circle at 5% 5%, rgba(86, 211, 156, 0.12), transparent 32%), radial-gradient(circle at 100% 0%, rgba(93, 214, 242, 0.12), transparent 34%), radial-gradient(circle at 80% 100%, rgba(244, 191, 98, 0.08), transparent 30%);
+  --atlas-aura: radial-gradient(circle at top left, rgba(86, 211, 156, 0.08), transparent 30%), radial-gradient(circle at bottom right, rgba(93, 214, 242, 0.08), transparent 26%);
+  --atlas-hero-aura: radial-gradient(circle at top, rgba(255, 255, 255, 0.05), transparent 35%), linear-gradient(135deg, rgba(86, 211, 156, 0.1), transparent 42%, rgba(93, 214, 242, 0.08));
+  --detail-aura: radial-gradient(circle at top left, rgba(16, 185, 129, 0.18), transparent 30%), radial-gradient(circle at top right, rgba(59, 130, 246, 0.16), transparent 25%), linear-gradient(180deg, rgba(7, 17, 16, 0.82), rgba(4, 10, 10, 0.98));
+  --accent-soft-bg: rgba(86, 211, 156, 0.1);
+  --accent-soft-bg-strong: rgba(86, 211, 156, 0.12);
+  --accent-soft-bg-hover: rgba(86, 211, 156, 0.16);
+  --accent-soft-border: rgba(86, 211, 156, 0.2);
+  --accent-soft-border-strong: rgba(134, 239, 172, 0.28);
+  --accent-soft-text: rgba(236, 253, 245, 0.95);
+  --accent-soft-text-muted: rgba(209, 250, 229, 0.72);
+  --accent-shadow: rgba(16, 185, 129, 0.12);
+  --accent-rail-glow: rgba(86, 211, 156, 0.6);
+  --secondary-soft-bg: rgba(93, 214, 242, 0.1);
+  --secondary-soft-bg-hover: rgba(93, 214, 242, 0.14);
+  --secondary-soft-border: rgba(93, 214, 242, 0.2);
+  --secondary-soft-border-strong: rgba(125, 211, 252, 0.28);
+  --secondary-soft-text: rgba(224, 242, 254, 0.95);
+  --warm-soft-bg: rgba(244, 191, 98, 0.12);
+  --warm-soft-bg-hover: rgba(244, 191, 98, 0.16);
+  --warm-soft-border: rgba(244, 191, 98, 0.22);
+  --warm-soft-text: rgba(254, 243, 199, 0.95);
+  --accent-solid-bg: #56d39c;
+  --accent-solid-bg-hover: #7dd3a4;
+  --accent-solid-text: #07110f;
+  --focus-border: rgba(86, 211, 156, 0.4);
+  --focus-ring: rgba(86, 211, 156, 0.18);
+  --accent-gradient: linear-gradient(90deg, rgba(86, 211, 156, 0.96), rgba(93, 214, 242, 0.92));
+  --spectrum-gradient: linear-gradient(90deg, rgba(93, 214, 242, 0.96), rgba(86, 211, 156, 0.94), rgba(244, 191, 98, 0.9));
+  --status-watching-bg: rgba(86, 211, 156, 0.1);
+  --status-watching-border: rgba(86, 211, 156, 0.2);
+  --status-watching-text: rgba(236, 253, 245, 0.95);
+  --status-completed-bg: rgba(93, 214, 242, 0.1);
+  --status-completed-border: rgba(93, 214, 242, 0.2);
+  --status-completed-text: rgba(224, 242, 254, 0.95);
+  --theme-dot: #56d39c;
+}
+
+html[data-theme='abyss'] {
+  --background: #051018;
+  --foreground: #eff6fb;
+  --card: #0c1924;
+  --card-foreground: #eff6fb;
+  --popover: #0d1824;
+  --popover-foreground: #eff6fb;
+  --primary: #72c7ff;
+  --primary-foreground: #041018;
+  --secondary: #122131;
+  --secondary-foreground: #eff6fb;
+  --muted: #0f1a27;
+  --muted-foreground: #a8c0d8;
+  --accent: #122536;
+  --accent-foreground: #eff6fb;
+  --destructive: #7f1d1d;
+  --destructive-foreground: #fafafa;
+  --border: #183247;
+  --input: #16293d;
+  --ring: #72c7ff;
+  --radius: 0.75rem;
+  --chart-1: #72c7ff;
+  --chart-2: #5fd0ff;
+  --chart-3: #7c9bff;
+  --chart-4: #5eead4;
+  --chart-5: #f6bf70;
+  --pulse-glow-rgb: 114, 199, 255;
+  --page-background:
+    radial-gradient(circle at 18% 0%, rgba(114, 199, 255, 0.18), transparent 32%),
+    radial-gradient(circle at 100% 12%, rgba(94, 234, 212, 0.11), transparent 28%),
+    radial-gradient(circle at 82% 100%, rgba(246, 191, 112, 0.08), transparent 30%),
+    linear-gradient(180deg, #051018 0%, #07131c 42%, #051018 100%);
+  --glass-panel-bg: linear-gradient(180deg, rgba(8, 16, 24, 0.95), rgba(9, 17, 26, 0.8));
+  --glass-panel-hover-bg: linear-gradient(180deg, rgba(10, 19, 29, 0.97), rgba(11, 20, 31, 0.86));
+  --glass-panel-border: rgba(101, 129, 156, 0.16);
+  --glass-panel-hover-border: rgba(114, 199, 255, 0.26);
+  --glass-panel-hover-glow: rgba(114, 199, 255, 0.08);
+  --glass-panel-strong-bg: linear-gradient(180deg, rgba(6, 13, 20, 0.98), rgba(8, 15, 23, 0.9));
+  --glass-panel-strong-border: rgba(111, 139, 168, 0.18);
+  --surface-card-bg: linear-gradient(180deg, rgba(15, 28, 40, 0.76), rgba(7, 15, 23, 0.54));
+  --surface-card-border: rgba(108, 137, 165, 0.18);
+  --surface-card-muted-bg: linear-gradient(180deg, rgba(12, 23, 34, 0.64), rgba(6, 12, 19, 0.42));
+  --surface-card-muted-border: rgba(99, 126, 151, 0.15);
+  --surface-pill-bg: rgba(10, 19, 29, 0.58);
+  --surface-pill-border: rgba(109, 137, 164, 0.16);
+  --surface-input-bg: rgba(6, 13, 20, 0.82);
+  --surface-input-border: rgba(107, 137, 165, 0.18);
+  --surface-highlight-glow: rgba(114, 199, 255, 0.06);
+  --route-loading-track-bg: linear-gradient(90deg, rgba(114, 199, 255, 0.08), rgba(94, 234, 212, 0.06));
+  --route-loading-bar-bg: linear-gradient(90deg, rgba(114, 199, 255, 0.92), rgba(94, 234, 212, 0.92));
+  --route-loading-bar-glow: rgba(114, 199, 255, 0.44);
+  --selection-background: rgba(114, 199, 255, 0.26);
+  --sidebar-aura: radial-gradient(circle at top left, rgba(114, 199, 255, 0.12), transparent 32%), radial-gradient(circle at bottom right, rgba(94, 234, 212, 0.1), transparent 28%);
+  --dashboard-aura: radial-gradient(circle at 5% 5%, rgba(114, 199, 255, 0.12), transparent 32%), radial-gradient(circle at 100% 0%, rgba(94, 234, 212, 0.12), transparent 34%), radial-gradient(circle at 80% 100%, rgba(246, 191, 112, 0.08), transparent 30%);
+  --atlas-aura: radial-gradient(circle at top left, rgba(114, 199, 255, 0.08), transparent 30%), radial-gradient(circle at bottom right, rgba(94, 234, 212, 0.08), transparent 26%);
+  --atlas-hero-aura: radial-gradient(circle at top, rgba(255, 255, 255, 0.05), transparent 35%), linear-gradient(135deg, rgba(114, 199, 255, 0.1), transparent 42%, rgba(124, 155, 255, 0.08));
+  --detail-aura: radial-gradient(circle at top left, rgba(114, 199, 255, 0.18), transparent 30%), radial-gradient(circle at top right, rgba(94, 234, 212, 0.14), transparent 25%), linear-gradient(180deg, rgba(5, 16, 24, 0.84), rgba(3, 9, 14, 0.98));
+  --accent-soft-bg: rgba(114, 199, 255, 0.1);
+  --accent-soft-bg-strong: rgba(114, 199, 255, 0.13);
+  --accent-soft-bg-hover: rgba(114, 199, 255, 0.16);
+  --accent-soft-border: rgba(114, 199, 255, 0.2);
+  --accent-soft-border-strong: rgba(186, 230, 253, 0.3);
+  --accent-soft-text: rgba(239, 246, 255, 0.96);
+  --accent-soft-text-muted: rgba(219, 234, 254, 0.74);
+  --accent-shadow: rgba(56, 189, 248, 0.12);
+  --accent-rail-glow: rgba(114, 199, 255, 0.6);
+  --secondary-soft-bg: rgba(94, 234, 212, 0.1);
+  --secondary-soft-bg-hover: rgba(94, 234, 212, 0.14);
+  --secondary-soft-border: rgba(94, 234, 212, 0.2);
+  --secondary-soft-border-strong: rgba(153, 246, 228, 0.28);
+  --secondary-soft-text: rgba(204, 251, 241, 0.95);
+  --warm-soft-bg: rgba(246, 191, 112, 0.12);
+  --warm-soft-bg-hover: rgba(246, 191, 112, 0.16);
+  --warm-soft-border: rgba(246, 191, 112, 0.22);
+  --warm-soft-text: rgba(254, 243, 199, 0.95);
+  --accent-solid-bg: #72c7ff;
+  --accent-solid-bg-hover: #93d5ff;
+  --accent-solid-text: #041018;
+  --focus-border: rgba(114, 199, 255, 0.4);
+  --focus-ring: rgba(114, 199, 255, 0.18);
+  --accent-gradient: linear-gradient(90deg, rgba(114, 199, 255, 0.96), rgba(94, 234, 212, 0.92));
+  --spectrum-gradient: linear-gradient(90deg, rgba(114, 199, 255, 0.96), rgba(124, 155, 255, 0.92), rgba(246, 191, 112, 0.9));
+  --status-watching-bg: rgba(114, 199, 255, 0.1);
+  --status-watching-border: rgba(114, 199, 255, 0.2);
+  --status-watching-text: rgba(239, 246, 255, 0.95);
+  --status-completed-bg: rgba(94, 234, 212, 0.1);
+  --status-completed-border: rgba(94, 234, 212, 0.2);
+  --status-completed-text: rgba(204, 251, 241, 0.95);
+  --theme-dot: #72c7ff;
+}
+
+html[data-theme='ember'] {
+  --background: #130907;
+  --foreground: #f9f3ef;
+  --card: #1d0f0c;
+  --card-foreground: #f9f3ef;
+  --popover: #1b100d;
+  --popover-foreground: #f9f3ef;
+  --primary: #f2a65a;
+  --primary-foreground: #160a07;
+  --secondary: #271613;
+  --secondary-foreground: #fff7ed;
+  --muted: #21120f;
+  --muted-foreground: #d8b3a1;
+  --accent: #2a1714;
+  --accent-foreground: #fff7ed;
+  --destructive: #7f1d1d;
+  --destructive-foreground: #fafafa;
+  --border: #3a211d;
+  --input: #341d18;
+  --ring: #f2a65a;
+  --radius: 0.75rem;
+  --chart-1: #f2a65a;
+  --chart-2: #ef7d57;
+  --chart-3: #ffd166;
+  --chart-4: #d6b38a;
+  --chart-5: #fb7185;
+  --pulse-glow-rgb: 242, 166, 90;
+  --page-background:
+    radial-gradient(circle at 18% 0%, rgba(242, 166, 90, 0.18), transparent 32%),
+    radial-gradient(circle at 100% 10%, rgba(239, 125, 87, 0.12), transparent 28%),
+    radial-gradient(circle at 82% 100%, rgba(255, 209, 102, 0.08), transparent 30%),
+    linear-gradient(180deg, #130907 0%, #160b09 40%, #120706 100%);
+  --glass-panel-bg: linear-gradient(180deg, rgba(23, 12, 10, 0.95), rgba(24, 13, 11, 0.8));
+  --glass-panel-hover-bg: linear-gradient(180deg, rgba(26, 14, 11, 0.97), rgba(28, 15, 12, 0.86));
+  --glass-panel-border: rgba(149, 110, 92, 0.16);
+  --glass-panel-hover-border: rgba(242, 166, 90, 0.28);
+  --glass-panel-hover-glow: rgba(242, 166, 90, 0.08);
+  --glass-panel-strong-bg: linear-gradient(180deg, rgba(19, 10, 8, 0.98), rgba(21, 11, 9, 0.9));
+  --glass-panel-strong-border: rgba(157, 118, 98, 0.18);
+  --surface-card-bg: linear-gradient(180deg, rgba(34, 18, 15, 0.76), rgba(18, 10, 8, 0.54));
+  --surface-card-border: rgba(153, 116, 96, 0.18);
+  --surface-card-muted-bg: linear-gradient(180deg, rgba(29, 16, 13, 0.64), rgba(16, 9, 7, 0.42));
+  --surface-card-muted-border: rgba(140, 107, 89, 0.15);
+  --surface-pill-bg: rgba(24, 13, 11, 0.58);
+  --surface-pill-border: rgba(150, 114, 95, 0.16);
+  --surface-input-bg: rgba(18, 10, 8, 0.82);
+  --surface-input-border: rgba(149, 113, 93, 0.18);
+  --surface-highlight-glow: rgba(242, 166, 90, 0.06);
+  --route-loading-track-bg: linear-gradient(90deg, rgba(242, 166, 90, 0.08), rgba(239, 125, 87, 0.06));
+  --route-loading-bar-bg: linear-gradient(90deg, rgba(242, 166, 90, 0.92), rgba(239, 125, 87, 0.92));
+  --route-loading-bar-glow: rgba(242, 166, 90, 0.42);
+  --selection-background: rgba(242, 166, 90, 0.28);
+  --sidebar-aura: radial-gradient(circle at top left, rgba(242, 166, 90, 0.12), transparent 32%), radial-gradient(circle at bottom right, rgba(239, 125, 87, 0.08), transparent 28%);
+  --dashboard-aura: radial-gradient(circle at 5% 5%, rgba(242, 166, 90, 0.12), transparent 32%), radial-gradient(circle at 100% 0%, rgba(239, 125, 87, 0.12), transparent 34%), radial-gradient(circle at 80% 100%, rgba(255, 209, 102, 0.08), transparent 30%);
+  --atlas-aura: radial-gradient(circle at top left, rgba(242, 166, 90, 0.08), transparent 30%), radial-gradient(circle at bottom right, rgba(239, 125, 87, 0.08), transparent 26%);
+  --atlas-hero-aura: radial-gradient(circle at top, rgba(255, 255, 255, 0.05), transparent 35%), linear-gradient(135deg, rgba(242, 166, 90, 0.1), transparent 42%, rgba(239, 125, 87, 0.08));
+  --detail-aura: radial-gradient(circle at top left, rgba(242, 166, 90, 0.18), transparent 30%), radial-gradient(circle at top right, rgba(239, 125, 87, 0.14), transparent 25%), linear-gradient(180deg, rgba(19, 10, 8, 0.84), rgba(11, 5, 4, 0.98));
+  --accent-soft-bg: rgba(242, 166, 90, 0.1);
+  --accent-soft-bg-strong: rgba(242, 166, 90, 0.13);
+  --accent-soft-bg-hover: rgba(242, 166, 90, 0.16);
+  --accent-soft-border: rgba(242, 166, 90, 0.2);
+  --accent-soft-border-strong: rgba(253, 186, 116, 0.3);
+  --accent-soft-text: rgba(255, 247, 237, 0.96);
+  --accent-soft-text-muted: rgba(254, 215, 170, 0.76);
+  --accent-shadow: rgba(234, 88, 12, 0.12);
+  --accent-rail-glow: rgba(242, 166, 90, 0.6);
+  --secondary-soft-bg: rgba(239, 125, 87, 0.1);
+  --secondary-soft-bg-hover: rgba(239, 125, 87, 0.14);
+  --secondary-soft-border: rgba(239, 125, 87, 0.2);
+  --secondary-soft-border-strong: rgba(251, 146, 60, 0.28);
+  --secondary-soft-text: rgba(255, 237, 213, 0.95);
+  --warm-soft-bg: rgba(255, 209, 102, 0.14);
+  --warm-soft-bg-hover: rgba(255, 209, 102, 0.18);
+  --warm-soft-border: rgba(255, 209, 102, 0.22);
+  --warm-soft-text: rgba(254, 243, 199, 0.95);
+  --accent-solid-bg: #f2a65a;
+  --accent-solid-bg-hover: #f7b979;
+  --accent-solid-text: #160a07;
+  --focus-border: rgba(242, 166, 90, 0.4);
+  --focus-ring: rgba(242, 166, 90, 0.18);
+  --accent-gradient: linear-gradient(90deg, rgba(242, 166, 90, 0.96), rgba(239, 125, 87, 0.92));
+  --spectrum-gradient: linear-gradient(90deg, rgba(242, 166, 90, 0.96), rgba(239, 125, 87, 0.92), rgba(255, 209, 102, 0.9));
+  --status-watching-bg: rgba(242, 166, 90, 0.1);
+  --status-watching-border: rgba(242, 166, 90, 0.2);
+  --status-watching-text: rgba(255, 247, 237, 0.95);
+  --status-completed-bg: rgba(239, 125, 87, 0.1);
+  --status-completed-border: rgba(239, 125, 87, 0.2);
+  --status-completed-text: rgba(255, 237, 213, 0.95);
+  --theme-dot: #f2a65a;
+}
+
+html[data-theme='garnet'] {
+  --background: #10070b;
+  --foreground: #f8f1f5;
+  --card: #1a0d12;
+  --card-foreground: #f8f1f5;
+  --popover: #190c11;
+  --popover-foreground: #f8f1f5;
+  --primary: #e784a6;
+  --primary-foreground: #16070c;
+  --secondary: #24131b;
+  --secondary-foreground: #fdf2f8;
+  --muted: #1d1016;
+  --muted-foreground: #d2aab9;
+  --accent: #29141d;
+  --accent-foreground: #fdf2f8;
+  --destructive: #7f1d1d;
+  --destructive-foreground: #fafafa;
+  --border: #381d29;
+  --input: #341a25;
+  --ring: #e784a6;
+  --radius: 0.75rem;
+  --chart-1: #e784a6;
+  --chart-2: #fb7185;
+  --chart-3: #c084fc;
+  --chart-4: #f4bf62;
+  --chart-5: #f9a8d4;
+  --pulse-glow-rgb: 231, 132, 166;
+  --page-background:
+    radial-gradient(circle at 18% 0%, rgba(231, 132, 166, 0.18), transparent 32%),
+    radial-gradient(circle at 100% 10%, rgba(192, 132, 252, 0.1), transparent 28%),
+    radial-gradient(circle at 82% 100%, rgba(244, 191, 98, 0.08), transparent 30%),
+    linear-gradient(180deg, #10070b 0%, #130910 40%, #0f060a 100%);
+  --glass-panel-bg: linear-gradient(180deg, rgba(20, 10, 15, 0.95), rgba(22, 11, 16, 0.8));
+  --glass-panel-hover-bg: linear-gradient(180deg, rgba(24, 12, 18, 0.97), rgba(25, 13, 19, 0.86));
+  --glass-panel-border: rgba(146, 102, 122, 0.16);
+  --glass-panel-hover-border: rgba(231, 132, 166, 0.26);
+  --glass-panel-hover-glow: rgba(231, 132, 166, 0.08);
+  --glass-panel-strong-bg: linear-gradient(180deg, rgba(18, 9, 13, 0.98), rgba(20, 10, 15, 0.9));
+  --glass-panel-strong-border: rgba(153, 108, 129, 0.18);
+  --surface-card-bg: linear-gradient(180deg, rgba(30, 16, 22, 0.76), rgba(16, 8, 12, 0.54));
+  --surface-card-border: rgba(149, 105, 126, 0.18);
+  --surface-card-muted-bg: linear-gradient(180deg, rgba(24, 13, 18, 0.64), rgba(13, 7, 10, 0.42));
+  --surface-card-muted-border: rgba(137, 97, 117, 0.15);
+  --surface-pill-bg: rgba(22, 11, 16, 0.58);
+  --surface-pill-border: rgba(146, 103, 123, 0.16);
+  --surface-input-bg: rgba(17, 8, 12, 0.82);
+  --surface-input-border: rgba(145, 103, 123, 0.18);
+  --surface-highlight-glow: rgba(231, 132, 166, 0.06);
+  --route-loading-track-bg: linear-gradient(90deg, rgba(231, 132, 166, 0.08), rgba(192, 132, 252, 0.06));
+  --route-loading-bar-bg: linear-gradient(90deg, rgba(231, 132, 166, 0.92), rgba(192, 132, 252, 0.92));
+  --route-loading-bar-glow: rgba(231, 132, 166, 0.42);
+  --selection-background: rgba(231, 132, 166, 0.28);
+  --sidebar-aura: radial-gradient(circle at top left, rgba(231, 132, 166, 0.12), transparent 32%), radial-gradient(circle at bottom right, rgba(192, 132, 252, 0.09), transparent 28%);
+  --dashboard-aura: radial-gradient(circle at 5% 5%, rgba(231, 132, 166, 0.12), transparent 32%), radial-gradient(circle at 100% 0%, rgba(192, 132, 252, 0.1), transparent 34%), radial-gradient(circle at 80% 100%, rgba(244, 191, 98, 0.08), transparent 30%);
+  --atlas-aura: radial-gradient(circle at top left, rgba(231, 132, 166, 0.08), transparent 30%), radial-gradient(circle at bottom right, rgba(192, 132, 252, 0.08), transparent 26%);
+  --atlas-hero-aura: radial-gradient(circle at top, rgba(255, 255, 255, 0.05), transparent 35%), linear-gradient(135deg, rgba(231, 132, 166, 0.1), transparent 42%, rgba(192, 132, 252, 0.08));
+  --detail-aura: radial-gradient(circle at top left, rgba(231, 132, 166, 0.18), transparent 30%), radial-gradient(circle at top right, rgba(192, 132, 252, 0.14), transparent 25%), linear-gradient(180deg, rgba(16, 7, 11, 0.84), rgba(9, 4, 7, 0.98));
+  --accent-soft-bg: rgba(231, 132, 166, 0.1);
+  --accent-soft-bg-strong: rgba(231, 132, 166, 0.13);
+  --accent-soft-bg-hover: rgba(231, 132, 166, 0.16);
+  --accent-soft-border: rgba(231, 132, 166, 0.2);
+  --accent-soft-border-strong: rgba(244, 171, 196, 0.3);
+  --accent-soft-text: rgba(253, 242, 248, 0.96);
+  --accent-soft-text-muted: rgba(251, 207, 232, 0.76);
+  --accent-shadow: rgba(190, 24, 93, 0.12);
+  --accent-rail-glow: rgba(231, 132, 166, 0.58);
+  --secondary-soft-bg: rgba(192, 132, 252, 0.1);
+  --secondary-soft-bg-hover: rgba(192, 132, 252, 0.14);
+  --secondary-soft-border: rgba(192, 132, 252, 0.2);
+  --secondary-soft-border-strong: rgba(216, 180, 254, 0.28);
+  --secondary-soft-text: rgba(243, 232, 255, 0.95);
+  --warm-soft-bg: rgba(244, 191, 98, 0.12);
+  --warm-soft-bg-hover: rgba(244, 191, 98, 0.16);
+  --warm-soft-border: rgba(244, 191, 98, 0.22);
+  --warm-soft-text: rgba(254, 243, 199, 0.95);
+  --accent-solid-bg: #e784a6;
+  --accent-solid-bg-hover: #f3a4c1;
+  --accent-solid-text: #16070c;
+  --focus-border: rgba(231, 132, 166, 0.4);
+  --focus-ring: rgba(231, 132, 166, 0.18);
+  --accent-gradient: linear-gradient(90deg, rgba(231, 132, 166, 0.96), rgba(192, 132, 252, 0.92));
+  --spectrum-gradient: linear-gradient(90deg, rgba(231, 132, 166, 0.96), rgba(192, 132, 252, 0.92), rgba(244, 191, 98, 0.9));
+  --status-watching-bg: rgba(231, 132, 166, 0.1);
+  --status-watching-border: rgba(231, 132, 166, 0.2);
+  --status-watching-text: rgba(253, 242, 248, 0.95);
+  --status-completed-bg: rgba(192, 132, 252, 0.1);
+  --status-completed-border: rgba(192, 132, 252, 0.2);
+  --status-completed-text: rgba(243, 232, 255, 0.95);
+  --theme-dot: #e784a6;
+}
+
+html {
+  font-size: 87.5%;
+  background: var(--page-background);
+}
+
+body {
+  color: var(--foreground);
+  background: transparent;
+  font-family: var(--font-body), sans-serif;
+  min-height: 100vh;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 120px 120px;
+  mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.7), transparent 92%);
+  opacity: 0.28;
+}
+
+.font-display {
+  font-family: var(--font-display), serif;
+}
+
+.font-mono {
+  font-family: var(--font-mono), monospace;
+}
+
+.theme-accent-text {
+  color: var(--accent-soft-text);
+}
+
+.theme-accent-text-muted {
+  color: var(--accent-soft-text-muted);
+}
+
+.theme-secondary-text {
+  color: var(--secondary-soft-text);
+}
+
+.theme-warm-text {
+  color: var(--warm-soft-text);
+}
+
+.theme-accent-soft {
+  border: 1px solid var(--accent-soft-border);
+  background: var(--accent-soft-bg-strong);
+  color: var(--accent-soft-text);
+}
+
+.theme-accent-soft:hover {
+  border-color: var(--accent-soft-border-strong);
+  background: var(--accent-soft-bg-hover);
+  color: #ffffff;
+}
+
+.theme-secondary-soft {
+  border: 1px solid var(--secondary-soft-border);
+  background: var(--secondary-soft-bg);
+  color: var(--secondary-soft-text);
+}
+
+.theme-secondary-soft:hover {
+  border-color: var(--secondary-soft-border-strong);
+  background: var(--secondary-soft-bg-hover);
+  color: #ffffff;
+}
+
+.theme-warm-soft {
+  border: 1px solid var(--warm-soft-border);
+  background: var(--warm-soft-bg);
+  color: var(--warm-soft-text);
+}
+
+.theme-warm-soft:hover {
+  background: var(--warm-soft-bg-hover);
+  color: #ffffff;
+}
+
+.theme-accent-button {
+  border: 1px solid var(--accent-soft-border);
+  background: var(--accent-solid-bg);
+  color: var(--accent-solid-text);
+}
+
+.theme-accent-button:hover {
+  background: var(--accent-solid-bg-hover);
+}
+
+.theme-focus-accent:focus {
+  outline: none;
+  border-color: var(--focus-border);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.theme-spectrum-gradient {
+  background: var(--spectrum-gradient);
+}
+
+.theme-accent-gradient {
+  background: var(--accent-gradient);
+}
+
+.theme-sidebar-aura {
+  background: var(--sidebar-aura);
+}
+
+.theme-dashboard-aura {
+  background: var(--dashboard-aura);
+}
+
+.theme-atlas-aura {
+  background: var(--atlas-aura);
+}
+
+.theme-atlas-hero-aura {
+  background: var(--atlas-hero-aura);
+}
+
+.theme-detail-aura {
+  background: var(--detail-aura);
+}
+
+.theme-active-nav {
+  background: var(--accent-soft-bg);
+  border-color: var(--accent-soft-border);
+  box-shadow: 0 18px 40px var(--accent-shadow);
+  color: var(--foreground);
+}
+
+.theme-active-rail {
+  background: var(--accent-soft-text);
+  box-shadow: 0 0 14px var(--accent-rail-glow);
+}
+
+.theme-active-overlay {
+  background: linear-gradient(90deg, var(--accent-soft-bg), rgba(255, 255, 255, 0.02), transparent);
+}
+
+.theme-active-icon {
+  border-color: var(--accent-soft-border-strong);
+  background: var(--accent-soft-bg-strong);
+  color: var(--accent-soft-text);
+}
+
+.theme-secondary-hover-card:hover {
+  border-color: var(--secondary-soft-border);
+}
+
+.theme-secondary-hover-text:hover {
+  color: var(--secondary-soft-text);
+}
+
+.theme-focus-parent:focus-within .theme-focus-icon {
+  color: var(--accent-soft-text);
+}
+
+.theme-status-watching {
+  border: 1px solid var(--status-watching-border);
+  background: var(--status-watching-bg);
+  color: var(--status-watching-text);
+}
+
+.theme-status-completed {
+  border: 1px solid var(--status-completed-border);
+  background: var(--status-completed-bg);
+  color: var(--status-completed-text);
+}
+
+.theme-switch-dot {
+  background: var(--theme-dot);
+  box-shadow: 0 0 10px var(--accent-rail-glow);
+}
+
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* 自定义动画 */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(var(--pulse-glow-rgb), 0);
+  }
+  50% {
+    box-shadow: 0 0 22px 6px rgba(var(--pulse-glow-rgb), 0.14);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.6s ease-out;
+}
+
+.animate-slide-in {
+  animation: slide-in 0.6s ease-out;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+@keyframes route-loading-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 玻璃拟态工具类 */
+.glass-panel {
+  background: var(--glass-panel-bg);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-panel-border);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.glass-panel:hover {
+  background: var(--glass-panel-hover-bg);
+  border-color: var(--glass-panel-hover-border);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.4),
+    0 0 26px var(--glass-panel-hover-glow);
+}
+
+.glass-panel-strong {
+  background: var(--glass-panel-strong-bg);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-panel-strong-border);
+  box-shadow:
+    0 30px 100px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.surface-card {
+  background: var(--surface-card-bg);
+  border: 1px solid var(--surface-card-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.025),
+    0 18px 36px rgba(0, 0, 0, 0.2);
+}
+
+.surface-card-muted {
+  background: var(--surface-card-muted-bg);
+  border: 1px solid var(--surface-card-muted-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.surface-pill {
+  background: var(--surface-pill-bg);
+  border: 1px solid var(--surface-pill-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.022);
+}
+
+.surface-input {
+  background: var(--surface-input-bg);
+  border: 1px solid var(--surface-input-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.022);
+}
+
+.surface-highlight {
+  position: relative;
+  overflow: hidden;
+}
+
+.surface-highlight::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.07), transparent 30%, transparent 70%, var(--surface-highlight-glow));
+}
+
+.soft-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+}
+
+.bg-grid-pattern {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+}
+
+.route-loading-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 120;
+  overflow: hidden;
+  background: var(--route-loading-track-bg);
+}
+
+.route-loading-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 34%;
+  background: var(--route-loading-bar-bg);
+  box-shadow: 0 0 18px var(--route-loading-bar-glow);
+  animation: route-loading-slide 0.9s ease-in-out infinite;
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  border: 2px solid currentColor;
+  animation: spin 0.7s linear infinite;
+}
+
+/* Offscreen rendering optimization */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 600px;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0b0d12;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #353d49;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #5a667a;
+}
+
+/* 选择文本样式 */
+::selection {
+  background: var(--selection-background);
+  color: #ffffff;
+}
+
+/* 平滑过渡（避免全局 * 触发过多重绘） */
+button,
+a,
+input,
+textarea,
+select,
+[role="button"] {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 骨架屏 shimmer 动画 */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.03) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+/* 封面图加载失败 fallback */
+.anime-cover-fallback {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(39, 39, 42, 0.8), rgba(24, 24, 27, 1));
+}
+
+.anime-cover-fallback::after {
+  content: '🎬';
+  font-size: 2rem;
+  opacity: 0.35;
+}

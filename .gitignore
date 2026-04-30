@@ -1,0 +1,65 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+/test-results/
+
+# next.js
+/.next/
+/.next-standby/
+/.next-build.lock
+/.next.bak.*/
+/out/
+
+# production
+/build
+/dist
+
+# IDE / Editor
+.vscode/
+
+# Database / Backup (个人数据不上传到 GitHub)
+/backups/
+/logs/
+/logs/maintenance/
+/docs-private/
+database/*.db
+database/*.sqlite
+
+# Misc
+.DS_Store
+/.tmp/
+/backtrace
+/nexttrace
+/geekbench_claim.url
+*.pem
+*.log
+
+# local env files (保护个人私密 API KEY 和密码)
+.env*.local
+.env
+!.env.example
+!.env.production.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+vite.config.js
+vite.config.d.ts
+
+# tauri
+/src-tauri/target/
+/src-tauri/gen/
+
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
