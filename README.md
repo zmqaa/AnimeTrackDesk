@@ -50,7 +50,7 @@ AnimeTrack 是一个本地优先的桌面追番记录应用，用来整理你在
 
 时间线页面会把你的观看记录按时间整理出来，方便回看最近看了什么、什么时候补到哪一集。
 
-![时间线截图占位](docs-images/timeline-placeholder.svg)
+![时间线截图占位](docs-images/timeline-placeholder.png)
 
 ### 5. 作品元数据图谱
 
