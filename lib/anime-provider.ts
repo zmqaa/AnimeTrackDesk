@@ -1,9 +1,12 @@
+import { extractSeasonNumber, normalizeTitleToken, stripSeasonToken } from './chinese-parser';
+
 export interface AnimeMetadata {
     coverUrl?: string;
     totalEpisodes?: number;
     title?: string;
     originalTitle?: string;
     score?: number;
+    durationMinutes?: number;
     description?: string;
     premiereDate?: string;
     cast?: string[];
@@ -71,6 +74,22 @@ interface BangumiV0Character {
     actors?: Array<{ name?: string; name_cn?: string }>;
 }
 
+function stringifyInfoboxValue(value: unknown): string {
+    if (typeof value === 'string' || typeof value === 'number') {
+        return String(value);
+    }
+
+    if (Array.isArray(value)) {
+        return value.map(stringifyInfoboxValue).filter(Boolean).join(' ');
+    }
+
+    if (value && typeof value === 'object') {
+        return Object.values(value as Record<string, unknown>).map(stringifyInfoboxValue).filter(Boolean).join(' ');
+    }
+
+    return '';
+}
+
 function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -123,15 +142,40 @@ async function fetchSubjectCharacters(subjectId: number): Promise<BangumiV0Chara
 /** 从搜索结果中挑出最佳匹配：优先 name 精确匹配，次选 partial，保持与查询词的一致性 */
 function pickBestMatch(candidates: BangumiV0Subject[], keyword: string): BangumiV0Subject | null {
     if (candidates.length === 0) return null;
-    // 精确：name 或 name_cn 完全一致
-    const exact = candidates.find(s => s.name === keyword || s.name_cn === keyword);
-    if (exact) return exact;
-    // Partial：name 包含 keyword 或反之
-    const partial = candidates.find(s =>
-        s.name?.includes(keyword) || keyword.includes(s.name ?? '') ||
-        (s.name_cn && (s.name_cn.includes(keyword) || keyword.includes(s.name_cn)))
-    );
-    return partial ?? candidates[0] ?? null;
+    const keywordToken = normalizeTitleToken(keyword);
+    const keywordBaseToken = normalizeTitleToken(stripSeasonToken(keyword));
+    const keywordSeason = extractSeasonNumber(keyword);
+
+    const scored = candidates
+        .map((subject) => {
+            const titleToken = normalizeTitleToken(subject.name);
+            const titleCnToken = normalizeTitleToken(subject.name_cn);
+            const baseTitleToken = normalizeTitleToken(stripSeasonToken(subject.name));
+            const baseTitleCnToken = normalizeTitleToken(stripSeasonToken(subject.name_cn));
+            const subjectSeason = extractSeasonNumber(subject.name_cn) ?? extractSeasonNumber(subject.name);
+
+            let score = 0;
+            if (subject.name === keyword || subject.name_cn === keyword) score += 1000;
+            if (keywordToken && (titleToken === keywordToken || titleCnToken === keywordToken)) score += 800;
+            if (keywordBaseToken && (baseTitleToken === keywordBaseToken || baseTitleCnToken === keywordBaseToken)) score += 200;
+            if (keywordToken && (
+                titleToken.includes(keywordToken)
+                || keywordToken.includes(titleToken)
+                || titleCnToken.includes(keywordToken)
+                || keywordToken.includes(titleCnToken)
+            )) score += 80;
+
+            if (keywordSeason && subjectSeason === keywordSeason) {
+                score += 300;
+            } else if (keywordSeason && subjectSeason && subjectSeason !== keywordSeason) {
+                score -= 400;
+            }
+
+            return { subject, score };
+        })
+        .sort((left, right) => right.score - left.score);
+
+    return scored[0] && scored[0].score > 0 ? scored[0].subject : null;
 }
 
 export const normalizeDate = normalizeDateString;
@@ -154,6 +198,28 @@ function extractCast(characters: BangumiV0Character[]): string[] {
         if (result.length >= MAX_CAST_MEMBERS) break;
     }
     return result;
+}
+
+function extractDurationMinutes(detail: BangumiV0Subject): number | undefined {
+    const entry = detail.infobox?.find((item) => /时长|片长|单集片长|播放时长|放送时长|每话长|每集长/i.test(String(item.key ?? '')));
+    if (!entry) {
+        return undefined;
+    }
+
+    const text = stringifyInfoboxValue(entry.value).replace(/\s+/g, ' ').trim();
+    if (!text) {
+        return undefined;
+    }
+
+    const minuteMatch = text.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:分钟|分|min|mins|minute|minutes)\b/i)
+        || text.match(/(?:约|每集|每话)?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:m)\b/i)
+        || text.match(/([0-9]+(?:\.[0-9]+)?)/);
+    if (!minuteMatch) {
+        return undefined;
+    }
+
+    const parsed = Number(minuteMatch[1]);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : undefined;
 }
 
 /**
@@ -203,6 +269,7 @@ export async function fetchAnimeMetadataByQueries(
             score: detail.rating?.score && detail.rating.score > 0
                 ? Math.round(detail.rating.score * 10) / 10
                 : undefined,
+            durationMinutes: extractDurationMinutes(detail),
             totalEpisodes,
             description: detail.summary?.trim() || undefined,
             premiereDate: normalizeDate(detail.date),

@@ -4,6 +4,8 @@ import { fetchAnimeMetadataByQueries } from "@/lib/anime-provider";
 import type { AnimeDetailItem, AnimeListItem, AnimeStatus } from "@/lib/anime-shared";
 import {
   appendSeasonToTitle,
+  extractSeasonNumber,
+  hasSeasonMarker,
   normalizeTitleToken,
   parseChineseNumberToken,
   stripSeasonToken,
@@ -290,6 +292,14 @@ function expandInclusiveRange(start: number, end: number) {
   return result;
 }
 
+function hasExplicitSeasonInRecord(record: Pick<ParsedQuickRecordIntent, "animeTitle" | "originalTitle" | "season">) {
+  return Boolean(
+    record.season
+    || hasSeasonMarker(record.animeTitle)
+    || (record.originalTitle && hasSeasonMarker(record.originalTitle)),
+  );
+}
+
 function extractSeasonNumbersFromTextForTitle(inputText: string, animeTitle: string) {
   const baseTitle = stripSeasonToken(animeTitle);
   if (!baseTitle) {
@@ -318,6 +328,14 @@ function extractSeasonNumbersFromTextForTitle(inputText: string, animeTitle: str
       ? expandInclusiveRange(first, second)
       : uniqueStrings([String(first), String(second)]).map(Number);
     return expanded.filter((item) => Number.isFinite(item) && item > 0);
+  }
+
+  const singleSeasonMatch = inputText.match(
+    new RegExp(`${escapedTitle}\\s*第\\s*([0-9一二三四五六七八九十百零两〇]+)\\s*季`),
+  );
+  const singleSeason = singleSeasonMatch ? parseChineseNumberToken(singleSeasonMatch[1]) : undefined;
+  if (singleSeason && singleSeason > 0) {
+    return [singleSeason];
   }
 
   return [] as number[];
@@ -356,6 +374,25 @@ function applyGlobalQuickRecordHints(inputText: string, batch: ParsedQuickRecord
           animeTitle: appendSeasonToTitle(baseTitle, season),
         });
       }
+      continue;
+    }
+
+    if (explicitSeasons.length === 1) {
+      const [season] = explicitSeasons;
+      expandedRecords.push(
+        ...records.map((record): ParsedQuickRecordIntent => {
+          if (hasExplicitSeasonInRecord(record)) {
+            return record;
+          }
+
+          return {
+            ...record,
+            season,
+            titleKind: record.titleKind === "official" ? "official" : "generic-season",
+            animeTitle: appendSeasonToTitle(baseTitle, season),
+          };
+        }),
+      );
       continue;
     }
 
@@ -537,35 +574,102 @@ function getItemTitleTokens(item: Pick<AnimeListItem, "title" | "originalTitle">
   return uniqueStrings([
     normalizeTitleToken(item.title),
     normalizeTitleToken(item.originalTitle),
+  ]);
+}
+
+function getItemBaseTitleTokens(item: Pick<AnimeListItem, "title" | "originalTitle">) {
+  return uniqueStrings([
     normalizeTitleToken(stripSeasonToken(item.title)),
     normalizeTitleToken(stripSeasonToken(item.originalTitle)),
   ]);
 }
 
+function getResolvedItemSeason(item: Pick<AnimeListItem, "title" | "originalTitle">) {
+  return extractSeasonNumber(item.title) ?? extractSeasonNumber(item.originalTitle);
+}
+
+function getResolvedParsedSeason(parsed: Pick<ParsedQuickRecordIntent, "animeTitle" | "originalTitle" | "season">) {
+  return parsed.season ?? extractSeasonNumber(parsed.animeTitle) ?? extractSeasonNumber(parsed.originalTitle);
+}
+
+function sortMatchingAnime(left: AnimeListItem, right: AnimeListItem) {
+  const leftWatching = left.status !== "completed";
+  const rightWatching = right.status !== "completed";
+  if (leftWatching !== rightWatching) {
+    return leftWatching ? -1 : 1;
+  }
+
+  return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+}
+
 function findMatchingAnime(items: AnimeListItem[], parsed: ParsedQuickRecordIntent) {
-  const targetTokens = uniqueStrings([
+  const exactTargetTokens = uniqueStrings([
     normalizeTitleToken(parsed.animeTitle),
     normalizeTitleToken(parsed.originalTitle),
+  ]);
+  const baseTargetTokens = uniqueStrings([
     normalizeTitleToken(stripSeasonToken(parsed.animeTitle)),
     normalizeTitleToken(stripSeasonToken(parsed.originalTitle)),
   ]);
+  const hasExplicitSeason = Boolean(
+    parsed.season
+    || hasSeasonMarker(parsed.animeTitle)
+    || (parsed.originalTitle && hasSeasonMarker(parsed.originalTitle)),
+  );
+  const requestedSeason = getResolvedParsedSeason(parsed);
+
+  const exactMatches = items
+    .filter((item) => getItemTitleTokens(item).some((token) => exactTargetTokens.includes(token)))
+    .sort(sortMatchingAnime);
+
+  if (requestedSeason) {
+    const exactSeasonMatch = exactMatches.find((item) => getResolvedItemSeason(item) === requestedSeason);
+    if (exactSeasonMatch) {
+      return exactSeasonMatch;
+    }
+  }
+
+  const exactMatch = exactMatches[0];
+
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  if (requestedSeason) {
+    const seasonAwareBaseMatch = items
+      .filter((item) => (
+        getResolvedItemSeason(item) === requestedSeason
+        && getItemBaseTitleTokens(item).some((token) => baseTargetTokens.includes(token))
+      ))
+      .sort(sortMatchingAnime)[0];
+
+    if (seasonAwareBaseMatch) {
+      return seasonAwareBaseMatch;
+    }
+  }
+
+  if (hasExplicitSeason) {
+    return null;
+  }
 
   return items
-    .filter((item) => getItemTitleTokens(item).some((token) => targetTokens.includes(token)))
-    .sort((left, right) => {
-      const leftWatching = left.status !== "completed";
-      const rightWatching = right.status !== "completed";
-      if (leftWatching !== rightWatching) {
-        return leftWatching ? -1 : 1;
-      }
-
-      return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
-    })[0] || null;
+    .filter((item) => getItemBaseTitleTokens(item).some((token) => baseTargetTokens.includes(token)))
+    .sort(sortMatchingAnime)[0] || null;
 }
 
-function findSameTitleRecords(items: AnimeListItem[], title: string) {
-  const titleToken = normalizeTitleToken(title);
-  return items.filter((item) => getItemTitleTokens(item).includes(titleToken));
+function findRelatedRecords(items: AnimeListItem[], target: Pick<AnimeListItem, "title" | "originalTitle">) {
+  const titleToken = normalizeTitleToken(target.title);
+  const baseTokens = getItemBaseTitleTokens(target);
+  const targetSeason = getResolvedItemSeason(target);
+
+  return items.filter((item) => {
+    if (targetSeason) {
+      return getResolvedItemSeason(item) === targetSeason
+        && getItemBaseTitleTokens(item).some((token) => baseTokens.includes(token));
+    }
+
+    return getItemTitleTokens(item).includes(titleToken);
+  });
 }
 
 function buildMetadataEnrichedFlag(parsed: ParsedQuickRecordIntent, detail: AnimeDetailItem) {
@@ -573,7 +677,9 @@ function buildMetadataEnrichedFlag(parsed: ParsedQuickRecordIntent, detail: Anim
     (!parsed.originalTitle && detail.originalTitle)
     || (!parsed.coverUrl && detail.coverUrl)
     || (!parsed.summary && detail.summary)
+    || (parsed.score === undefined && detail.score !== undefined)
     || (!parsed.totalEpisodes && detail.totalEpisodes)
+    || (!parsed.durationMinutes && detail.durationMinutes)
     || (!(parsed.tags && parsed.tags.length > 0) && detail.tags && detail.tags.length > 0)
     || (!(parsed.cast && parsed.cast.length > 0) && detail.cast && detail.cast.length > 0)
     || (!parsed.premiereDate && detail.premiereDate)
@@ -603,20 +709,21 @@ function resolveCompletedProgress(progress: number, status: AnimeStatus | Parsed
 
 async function processCreateQuickRecord(
   parsedInput: ParsedQuickRecordIntent,
-  options: { rewatchTag?: string },
+  options: { rewatchTag?: string; rawText?: string },
 ): Promise<DesktopQuickRecordResult> {
   const parsed = { ...parsedInput, animeTitle: parsedInput.animeTitle.trim() };
   const metadata = await enrichMetadata(parsed);
   const created = upsertDesktopAnimeItem(null, {
-    title: metadata?.title || parsed.animeTitle,
+    title: parsed.animeTitle,
     originalTitle: parsed.originalTitle || metadata?.originalTitle,
     progress: 0,
     totalEpisodes: parsed.totalEpisodes || metadata?.totalEpisodes,
     status: parsed.status === "plan_to_watch" ? "plan_to_watch" : "watching",
+    score: parsed.score ?? metadata?.score,
     notes: parsed.notes,
     coverUrl: parsed.coverUrl || metadata?.coverUrl,
     tags: uniqueStrings([...(metadata?.tags || []), ...(parsed.tags || []), options.rewatchTag]),
-    durationMinutes: parsed.durationMinutes,
+    durationMinutes: parsed.durationMinutes ?? metadata?.durationMinutes,
     startDate: undefined,
     endDate: undefined,
     isFinished: parsed.isFinished ?? metadata?.isFinished ?? false,
@@ -631,6 +738,8 @@ async function processCreateQuickRecord(
     summary: parsed.summary || metadata?.description,
     premiereDate: parsed.premiereDate || metadata?.premiereDate,
     cast: mergeStringArrays(metadata?.cast, parsed.cast),
+    score: created.entry.score === undefined ? (parsed.score ?? metadata?.score) : undefined,
+    durationMinutes: created.entry.durationMinutes === undefined ? (parsed.durationMinutes ?? metadata?.durationMinutes) : undefined,
   };
 
   if (hasPatchChanges(createPatch)) {
@@ -695,8 +804,9 @@ async function processUpdateQuickRecord(
   const mergedCast = mergeStringArrays(detail.cast, metadata?.cast, parsed.cast);
   const patch = {
     originalTitle: !detail.originalTitle ? (parsed.originalTitle || metadata?.originalTitle) : undefined,
+    score: (detail.score === undefined || detail.score <= 0) ? (parsed.score ?? metadata?.score) : undefined,
     totalEpisodes: !detail.totalEpisodes && effectiveTotalEpisodes ? effectiveTotalEpisodes : undefined,
-    durationMinutes: detail.durationMinutes === undefined ? parsed.durationMinutes : undefined,
+    durationMinutes: detail.durationMinutes === undefined ? (parsed.durationMinutes ?? metadata?.durationMinutes) : undefined,
     notes: !detail.notes ? parsed.notes : undefined,
     summary: !detail.summary ? (parsed.summary || metadata?.description) : undefined,
     coverUrl: !detail.coverUrl ? (parsed.coverUrl || metadata?.coverUrl) : undefined,
@@ -753,11 +863,11 @@ async function processDesktopQuickRecordIntent(
   let rewatchTag = parsed.rewatchTag || detectRewatchTag(rawText);
 
   if (existing && !rewatchTag && shouldAutoResolveRewatch(parsed, existing)) {
-    rewatchTag = resolveNextRewatchTag(findSameTitleRecords(items, existing.title));
+    rewatchTag = resolveNextRewatchTag(findRelatedRecords(items, existing));
   }
 
   if (!existing || rewatchTag) {
-    return processCreateQuickRecord(parsed, { rewatchTag });
+    return processCreateQuickRecord(parsed, { rewatchTag, rawText });
   }
 
   return processUpdateQuickRecord(parsed, existing);

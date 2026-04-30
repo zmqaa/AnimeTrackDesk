@@ -57,6 +57,7 @@ export interface DesktopAnimeUpsertInput {
   progress: number;
   totalEpisodes?: number;
   status: AnimeStatus;
+  score?: number | null;
   notes?: string;
   coverUrl?: string;
   tags: string[];
@@ -964,7 +965,7 @@ export function upsertDesktopAnimeItem(editingId: number | null, input: DesktopA
     episodes: nextEpisodes,
     progress: nextProgress,
     status: mapUiStatus(normalizedStatus),
-    score: existingEntry?.score || 0,
+    score: input.score === undefined ? (existingEntry?.score || 0) : Math.max(0, input.score ?? 0),
     tags: uniqueStrings(input.tags),
     summary: existingEntry?.summary || "",
     notes: normalizeOptionalText(input.notes),

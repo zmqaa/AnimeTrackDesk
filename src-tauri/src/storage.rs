@@ -1,6 +1,7 @@
 use std::{collections::HashSet, fs, path::{Path, PathBuf}};
 
 use crate::secure_storage::{self, DesktopSecretKey};
+use chrono::{DateTime, Local};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
@@ -241,6 +242,14 @@ fn resolve_backup_directory(database_path: &Path) -> Result<PathBuf, String> {
 }
 
 fn create_backup_name(created_at: &str) -> String {
+  if let Ok(parsed) = DateTime::parse_from_rfc3339(created_at) {
+    let local_time = parsed.with_timezone(&Local);
+    return format!(
+      "animetrack-backup-{}.json",
+      local_time.format("%Y-%m-%d_%H-%M-%S")
+    );
+  }
+
   let mut sanitized = created_at.replace(':', "-").replace('T', "_");
 
   if let Some(prefix) = sanitized.strip_suffix('Z') {

@@ -92,8 +92,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function padBackupDatePart(value: number) {
+  return String(value).padStart(2, "0");
+}
+
 function createBackupName(createdAt: string) {
-  return `animetrack-backup-${createdAt.replace(/[:]/g, "-").replace(/\.\d+Z$/, "Z").replace("T", "_")}.json`;
+  const parsed = new Date(createdAt);
+  if (Number.isNaN(parsed.getTime())) {
+    return `animetrack-backup-${createdAt.replace(/[:]/g, "-").replace(/\.\d+Z$/, "Z").replace("T", "_")}.json`;
+  }
+
+  const localTimestamp = [
+    parsed.getFullYear(),
+    padBackupDatePart(parsed.getMonth() + 1),
+    padBackupDatePart(parsed.getDate()),
+  ].join("-") + "_" + [
+    padBackupDatePart(parsed.getHours()),
+    padBackupDatePart(parsed.getMinutes()),
+    padBackupDatePart(parsed.getSeconds()),
+  ].join("-");
+
+  return `animetrack-backup-${localTimestamp}.json`;
 }
 
 function escapeCsvValue(value: unknown): string {
