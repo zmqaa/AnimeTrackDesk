@@ -1,4 +1,5 @@
 import { useTheme } from "@/components/theme/ThemeProvider";
+import { formatLocalDateTimeString } from "@/src/lib/local-date-time";
 import type { AppTheme } from "@/lib/theme";
 import { readDesktopRuntimeInfo, type DesktopRuntimeInfo } from "@/src/lib/desktop";
 import {
@@ -70,22 +71,7 @@ const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
 ];
 
 function formatDateTime(value: string | null) {
-  if (!value) {
-    return "尚未保存";
-  }
-
-  const parsedDate = new Date(value);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return "尚未保存";
-  }
-
-  return parsedDate.toLocaleString("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatLocalDateTimeString(value, "尚未保存");
 }
 
 function describeStorageMode(runtimeInfo: DesktopRuntimeInfo | null) {

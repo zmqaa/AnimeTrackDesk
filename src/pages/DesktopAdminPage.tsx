@@ -1,4 +1,5 @@
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
+import { formatLocalDateTimeString } from "@/src/lib/local-date-time";
 import {
   Checkbox,
   DeleteButton,
@@ -37,13 +38,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleString("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatLocalDateTimeString(iso);
 }
 
 function AnimeTab() {

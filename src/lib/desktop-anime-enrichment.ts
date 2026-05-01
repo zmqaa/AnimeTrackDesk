@@ -56,7 +56,7 @@ const FIELD_SOURCE_PRIORITY: Record<MetadataField, MetadataSource[]> = {
   score: ["provider"],
   totalEpisodes: ["provider", "ai"],
   durationMinutes: ["ai", "provider"],
-  summary: ["ai", "provider"],
+  summary: ["provider", "ai"],
   tags: ["ai", "provider"],
   premiereDate: ["provider", "ai"],
   cast: ["provider", "ai"],
@@ -292,6 +292,31 @@ function buildMetadataCandidate(provider?: MetadataSourceRecord | null, ai?: Met
   return candidate;
 }
 
+function hasMissingMetadataField(current: AnimeDetailItem, field: MetadataField) {
+  switch (field) {
+    case "originalTitle":
+    case "coverUrl":
+    case "summary":
+      return !String(current[field] || "").trim();
+    case "score":
+    case "totalEpisodes":
+    case "durationMinutes": {
+      const numeric = Number(current[field]);
+      return !Number.isFinite(numeric) || numeric <= 0;
+    }
+    case "premiereDate":
+      return !normalizeMetadataDate(current.premiereDate);
+    case "tags":
+    case "cast":
+    case "castAliases":
+      return !Array.isArray(current[field]) || current[field].length === 0;
+    case "isFinished":
+      return current.isFinished === undefined || current.isFinished === null;
+    default:
+      return false;
+  }
+}
+
 function buildMetadataPatch(current: AnimeDetailItem, candidate: Partial<Record<MetadataField, unknown>>) {
   const patch: DesktopAnimeMetadataPatch = {};
 
@@ -301,7 +326,7 @@ function buildMetadataPatch(current: AnimeDetailItem, candidate: Partial<Record<
       continue;
     }
 
-    if (!sameMetadataFieldValue(field, current[field], normalizedNext)) {
+    if (hasMissingMetadataField(current, field) && !sameMetadataFieldValue(field, current[field], normalizedNext)) {
       (patch as Record<string, unknown>)[field] = normalizedNext;
     }
   }
@@ -428,11 +453,6 @@ export async function enrichDesktopAnimeEntryMetadata(item: AnimeDetailItem): Pr
   const nextPatch: DesktopAnimeMetadataPatch = {
     ...metadataPatch,
   };
-  const preferredTitle = providerMetadata?.title || aiMetadata?.title;
-
-  if (preferredTitle && preferredTitle !== item.title) {
-    nextPatch.title = preferredTitle;
-  }
 
   if (item.score !== undefined && item.score !== null) {
     delete nextPatch.score;

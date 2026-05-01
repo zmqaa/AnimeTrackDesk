@@ -70,7 +70,31 @@ type DesktopQuickRecordResult = {
   entry: AnimeDetailItem;
 };
 
-type DesktopQuickRecordCommand = "parse_desktop_quick_record";
+type DesktopQuickRecordAiMetadata = {
+  title?: string;
+  originalTitle?: string;
+  totalEpisodes?: number;
+  durationMinutes?: number;
+  summary?: string;
+  tags?: string[];
+  premiereDate?: string;
+  isFinished?: boolean;
+  coverUrl?: string;
+};
+
+type DesktopQuickRecordMetadata = Awaited<ReturnType<typeof fetchAnimeMetadataByQueries>> & {
+  title?: string;
+  originalTitle?: string;
+  totalEpisodes?: number;
+  durationMinutes?: number;
+  description?: string;
+  premiereDate?: string;
+  isFinished?: boolean;
+  coverUrl?: string;
+  tags?: string[];
+};
+
+type DesktopQuickRecordCommand = "parse_desktop_quick_record" | "enrich_desktop_anime_metadata";
 
 const QUICK_RECORD_HISTORY_NOTE = "通过桌面端 AI 录入补记了观看记录。";
 
@@ -154,16 +178,16 @@ function shouldAutoResolveRewatch(
     return false;
   }
 
+  const hasReplaySignal = parsed.status === "completed" || parsed.episode !== undefined || parsed.progress !== undefined;
+  if (!hasReplaySignal) {
+    return false;
+  }
+
   if (parsed.status === "completed") {
     return true;
   }
 
-  if (parsed.episode === 1 || parsed.progress === 1) {
-    return true;
-  }
-
-  const hasExplicitProgress = parsed.episode !== undefined || parsed.progress !== undefined;
-  return !hasExplicitProgress && (parsed.status === "watching" || parsed.status === undefined);
+  return parsed.episode === 1 || parsed.progress === 1;
 }
 
 function toDateString(date: Date) {
@@ -177,7 +201,15 @@ function resolveRecordedDateString(parsed: ParsedQuickRecordIntent) {
   return parsed.watchedAt || (!parsed.isHistorical ? toDateString(new Date()) : undefined);
 }
 
+function hasExplicitProgress(parsed: Pick<ParsedQuickRecordIntent, "progress" | "episode">) {
+  return parsed.progress !== undefined || parsed.episode !== undefined;
+}
+
 function resolveIntentStatus(parsed: ParsedQuickRecordIntent, progress: number) {
+  if (!hasExplicitProgress(parsed)) {
+    return parsed.status || "watching";
+  }
+
   if (parsed.status) {
     return parsed.status;
   }
@@ -190,6 +222,10 @@ function resolveIntentStatus(parsed: ParsedQuickRecordIntent, progress: number) 
 }
 
 function resolveTargetProgress(parsed: ParsedQuickRecordIntent, currentProgress: number, totalEpisodes?: number) {
+  if (!hasExplicitProgress(parsed)) {
+    return currentProgress;
+  }
+
   if (parsed.status === "completed" && totalEpisodes && totalEpisodes > 0) {
     return totalEpisodes;
   }
@@ -207,6 +243,28 @@ function resolveTargetProgress(parsed: ParsedQuickRecordIntent, currentProgress:
   }
 
   return currentProgress > 0 ? currentProgress + 1 : 1;
+}
+
+function resolveCreateTitle(parsed: ParsedQuickRecordIntent, metadataTitle: string | undefined) {
+  const normalizedMetadataTitle = toOptionalString(metadataTitle);
+  if (!normalizedMetadataTitle) {
+    return parsed.animeTitle;
+  }
+
+  const requestedSeason = getResolvedParsedSeason(parsed);
+  if (!requestedSeason) {
+    return normalizedMetadataTitle;
+  }
+
+  const metadataSeason = extractSeasonNumber(normalizedMetadataTitle);
+  const parsedBaseTitle = normalizeTitleToken(stripSeasonToken(parsed.animeTitle));
+  const metadataBaseTitle = normalizeTitleToken(stripSeasonToken(normalizedMetadataTitle));
+
+  if (metadataSeason === requestedSeason && parsedBaseTitle && metadataBaseTitle && parsedBaseTitle === metadataBaseTitle) {
+    return normalizedMetadataTitle;
+  }
+
+  return parsed.animeTitle;
 }
 
 function mergeStringArrays(...arrays: Array<string[] | undefined>) {
@@ -500,7 +558,6 @@ function normalizeQuickRecordIntent(value: unknown): ParsedQuickRecordIntent | n
     premiereDate: toOptionalDateString(payload.premiereDate),
     status: toOptionalQuickRecordStatus(payload.status),
     score: toOptionalFiniteNumber(payload.score),
-    notes: toOptionalString(payload.notes),
     tags: toStringArray(payload.tags),
     totalEpisodes: toOptionalNumber(payload.totalEpisodes),
     durationMinutes: toOptionalNumber(payload.durationMinutes),
@@ -545,6 +602,61 @@ function ensureDesktopQuickRecordAiSettings(value: DesktopAiProviderSettings) {
   if (!value.provider.trim() || !value.baseUrl.trim() || !value.model.trim() || !value.apiKey.trim()) {
     throw new Error("AI 录入前，请先在设置页补齐 Provider、Base URL、模型和 API Key。");
   }
+}
+
+function hasReadyDesktopQuickRecordAiSettings(value: DesktopAiProviderSettings) {
+  return value.enabled
+    && Boolean(value.provider.trim())
+    && Boolean(value.baseUrl.trim())
+    && Boolean(value.model.trim())
+    && Boolean(value.apiKey.trim());
+}
+
+function normalizeDesktopQuickRecordAiMetadataPayload(value: unknown): DesktopQuickRecordAiMetadata | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const payload = value as Record<string, unknown>;
+  return {
+    title: toOptionalString(payload.officialTitle) || toOptionalString(payload.title),
+    originalTitle: toOptionalString(payload.originalTitle),
+    totalEpisodes: toOptionalNumber(payload.totalEpisodes),
+    durationMinutes: toOptionalNumber(payload.durationMinutes),
+    summary: toOptionalString(payload.synopsis) || toOptionalString(payload.summary),
+    tags: toStringArray(payload.tags),
+    premiereDate: toOptionalDateString(payload.premiereDate),
+    isFinished: toOptionalBoolean(payload.isFinished),
+    coverUrl: toOptionalString(payload.coverUrl),
+  };
+}
+
+async function fetchDesktopQuickRecordAiMetadata(queryName: string, settings: DesktopAiProviderSettings) {
+  if (!hasReadyDesktopQuickRecordAiSettings(settings)) {
+    return null;
+  }
+
+  const response = await invokeDesktopQuickRecordCommand<Record<string, unknown>>("enrich_desktop_anime_metadata", {
+    queryName,
+    settings,
+  });
+
+  return normalizeDesktopQuickRecordAiMetadataPayload(response);
+}
+
+function buildDesktopQuickRecordProviderQueries(parsed: ParsedQuickRecordIntent, aiMetadata: DesktopQuickRecordAiMetadata | null) {
+  return Array.from(
+    new Set(
+      [
+        aiMetadata?.originalTitle,
+        aiMetadata?.title,
+        parsed.originalTitle,
+        parsed.animeTitle,
+      ]
+        .map((value) => value?.trim())
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
 }
 
 async function parseDesktopQuickRecordBatch(inputText: string, settings: DesktopAiProviderSettings): Promise<ParsedQuickRecordBatch> {
@@ -687,9 +799,29 @@ function buildMetadataEnrichedFlag(parsed: ParsedQuickRecordIntent, detail: Anim
   );
 }
 
-async function enrichMetadata(parsed: ParsedQuickRecordIntent) {
+async function enrichMetadata(parsed: ParsedQuickRecordIntent, settings: DesktopAiProviderSettings) {
   try {
-    return await fetchAnimeMetadataByQueries(parsed.originalTitle, parsed.animeTitle);
+    const aiMetadata = await fetchDesktopQuickRecordAiMetadata(parsed.originalTitle?.trim() || parsed.animeTitle.trim(), settings);
+    const providerMetadata = await fetchAnimeMetadataByQueries(...buildDesktopQuickRecordProviderQueries(parsed, aiMetadata));
+
+    if (!providerMetadata && !aiMetadata) {
+      return null;
+    }
+
+    const merged: DesktopQuickRecordMetadata = {
+      ...providerMetadata,
+      title: providerMetadata?.title || aiMetadata?.title,
+      originalTitle: providerMetadata?.originalTitle || aiMetadata?.originalTitle,
+      totalEpisodes: providerMetadata?.totalEpisodes ?? aiMetadata?.totalEpisodes,
+      durationMinutes: aiMetadata?.durationMinutes ?? providerMetadata?.durationMinutes,
+      description: providerMetadata?.description || aiMetadata?.summary,
+      premiereDate: providerMetadata?.premiereDate || aiMetadata?.premiereDate,
+      isFinished: providerMetadata?.isFinished ?? aiMetadata?.isFinished,
+      coverUrl: providerMetadata?.coverUrl || aiMetadata?.coverUrl,
+      tags: uniqueStrings([...(aiMetadata?.tags || []), ...(providerMetadata?.tags || [])]),
+    };
+
+    return merged;
   } catch {
     return null;
   }
@@ -709,18 +841,18 @@ function resolveCompletedProgress(progress: number, status: AnimeStatus | Parsed
 
 async function processCreateQuickRecord(
   parsedInput: ParsedQuickRecordIntent,
-  options: { rewatchTag?: string; rawText?: string },
+  options: { rewatchTag?: string; rawText?: string; aiSettings: DesktopAiProviderSettings },
 ): Promise<DesktopQuickRecordResult> {
   const parsed = { ...parsedInput, animeTitle: parsedInput.animeTitle.trim() };
-  const metadata = await enrichMetadata(parsed);
+  const shouldApplyProgress = hasExplicitProgress(parsed) || parsed.status === "completed";
+  const metadata = await enrichMetadata(parsed, options.aiSettings);
   const created = upsertDesktopAnimeItem(null, {
-    title: parsed.animeTitle,
+    title: resolveCreateTitle(parsed, metadata?.title),
     originalTitle: parsed.originalTitle || metadata?.originalTitle,
     progress: 0,
     totalEpisodes: parsed.totalEpisodes || metadata?.totalEpisodes,
     status: parsed.status === "plan_to_watch" ? "plan_to_watch" : "watching",
     score: parsed.score ?? metadata?.score,
-    notes: parsed.notes,
     coverUrl: parsed.coverUrl || metadata?.coverUrl,
     tags: uniqueStrings([...(metadata?.tags || []), ...(parsed.tags || []), options.rewatchTag]),
     durationMinutes: parsed.durationMinutes ?? metadata?.durationMinutes,
@@ -747,15 +879,20 @@ async function processCreateQuickRecord(
   }
 
   const recordedDateString = resolveRecordedDateString(parsed);
-  const targetProgress = resolveCompletedProgress(
-    resolveTargetProgress(parsed, 0, entry.totalEpisodes || undefined),
-    parsed.status,
-    entry.totalEpisodes || undefined,
-  );
+  const targetProgress = shouldApplyProgress
+    ? resolveCompletedProgress(
+      resolveTargetProgress(parsed, 0, entry.totalEpisodes || undefined),
+      parsed.status,
+      entry.totalEpisodes || undefined,
+    )
+    : 0;
   const resolvedStatus = resolveIntentStatus(parsed, targetProgress);
-  const shouldWriteHistory = Boolean(recordedDateString) && targetProgress > 0 && resolvedStatus !== "plan_to_watch";
+  const shouldWriteHistory = shouldApplyProgress
+    && Boolean(recordedDateString)
+    && targetProgress > 0
+    && resolvedStatus !== "plan_to_watch";
 
-  if (targetProgress > 0 || resolvedStatus === "completed") {
+  if (shouldApplyProgress && (targetProgress > 0 || resolvedStatus === "completed")) {
     recordDesktopAnimeProgress({
       id: entry.id,
       requestedProgress: targetProgress,
@@ -786,20 +923,24 @@ async function processCreateQuickRecord(
 async function processUpdateQuickRecord(
   parsedInput: ParsedQuickRecordIntent,
   current: AnimeListItem,
+  aiSettings: DesktopAiProviderSettings,
 ): Promise<DesktopQuickRecordResult> {
   const parsed = { ...parsedInput, animeTitle: parsedInput.animeTitle.trim() };
+  const shouldApplyProgress = hasExplicitProgress(parsed) || parsed.status === "completed";
   let detail = loadDesktopAnimeDetailItem(current.id);
   if (!detail) {
     throw new Error("未找到对应番剧");
   }
 
-  const metadata = await enrichMetadata(parsed);
+  const metadata = await enrichMetadata(parsed, aiSettings);
   const effectiveTotalEpisodes = parsed.totalEpisodes || detail.totalEpisodes || metadata?.totalEpisodes;
-  const targetProgress = resolveCompletedProgress(
-    resolveTargetProgress(parsed, detail.progress, effectiveTotalEpisodes),
-    parsed.status,
-    effectiveTotalEpisodes,
-  );
+  const targetProgress = shouldApplyProgress
+    ? resolveCompletedProgress(
+      resolveTargetProgress(parsed, detail.progress, effectiveTotalEpisodes),
+      parsed.status,
+      effectiveTotalEpisodes,
+    )
+    : detail.progress;
   const mergedTags = mergeStringArrays(detail.tags, metadata?.tags, parsed.tags);
   const mergedCast = mergeStringArrays(detail.cast, metadata?.cast, parsed.cast);
   const patch = {
@@ -807,7 +948,6 @@ async function processUpdateQuickRecord(
     score: (detail.score === undefined || detail.score <= 0) ? (parsed.score ?? metadata?.score) : undefined,
     totalEpisodes: !detail.totalEpisodes && effectiveTotalEpisodes ? effectiveTotalEpisodes : undefined,
     durationMinutes: detail.durationMinutes === undefined ? (parsed.durationMinutes ?? metadata?.durationMinutes) : undefined,
-    notes: !detail.notes ? parsed.notes : undefined,
     summary: !detail.summary ? (parsed.summary || metadata?.description) : undefined,
     coverUrl: !detail.coverUrl ? (parsed.coverUrl || metadata?.coverUrl) : undefined,
     premiereDate: !detail.premiereDate ? (parsed.premiereDate || metadata?.premiereDate) : undefined,
@@ -821,7 +961,7 @@ async function processUpdateQuickRecord(
   }
 
   const recordedDateString = resolveRecordedDateString(parsed);
-  const shouldWriteHistory = Boolean(recordedDateString) && targetProgress > 0;
+  const shouldWriteHistory = shouldApplyProgress && Boolean(recordedDateString) && targetProgress > 0;
   const forceHistory = shouldWriteHistory && targetProgress <= detail.progress;
   const shouldRecordProgress = targetProgress > detail.progress || forceHistory;
 
@@ -837,7 +977,9 @@ async function processUpdateQuickRecord(
     detail = loadDesktopAnimeDetailItem(detail.id) || detail;
   }
 
-  const resolvedStatus = parsed.status || ((detail.totalEpisodes && targetProgress >= detail.totalEpisodes) ? "completed" : undefined);
+  const resolvedStatus = shouldApplyProgress
+    ? (parsed.status || ((detail.totalEpisodes && targetProgress >= detail.totalEpisodes) ? "completed" : undefined))
+    : undefined;
   if (resolvedStatus && resolvedStatus !== detail.status) {
     detail = updateDesktopAnimeDetailItem(detail.id, { status: resolvedStatus }).entry;
   }
@@ -857,6 +999,7 @@ async function processUpdateQuickRecord(
 async function processDesktopQuickRecordIntent(
   parsed: ParsedQuickRecordIntent,
   rawText: string,
+  aiSettings: DesktopAiProviderSettings,
 ): Promise<DesktopQuickRecordResult> {
   const items = loadDesktopAnimeListItems();
   const existing = findMatchingAnime(items, parsed);
@@ -867,10 +1010,10 @@ async function processDesktopQuickRecordIntent(
   }
 
   if (!existing || rewatchTag) {
-    return processCreateQuickRecord(parsed, { rewatchTag, rawText });
+    return processCreateQuickRecord(parsed, { rewatchTag, rawText, aiSettings });
   }
 
-  return processUpdateQuickRecord(parsed, existing);
+  return processUpdateQuickRecord(parsed, existing, aiSettings);
 }
 
 export async function quickRecordDesktopAnimeFromText(rawText: string): Promise<QuickRecordResponse> {
@@ -892,7 +1035,7 @@ export async function quickRecordDesktopAnimeFromText(rawText: string): Promise<
 
   for (const parsed of parsedBatch.records) {
     try {
-      results.push(await processDesktopQuickRecordIntent(parsed, text));
+      results.push(await processDesktopQuickRecordIntent(parsed, text, settings.ai));
     } catch (error) {
       errors.push({
         title: parsed.animeTitle,

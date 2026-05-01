@@ -1,4 +1,5 @@
 import type { AnimeRecord, WatchHistoryRecord } from "@/lib/dashboard-types";
+import { getLocalTodayDateString } from "@/src/lib/local-date-time";
 import { writeSessionCache } from "@/lib/hooks-shared";
 import type { AnimeDetailItem, AnimeListItem, AnimeStatus } from "@/lib/anime-shared";
 import { DESKTOP_DASHBOARD_CACHE_KEYS } from "@/src/lib/desktop-dashboard-shared";
@@ -553,7 +554,7 @@ function buildAnimeListItem(entry: StoredAnimeEntry): AnimeListItem {
     progress: entry.progress,
     totalEpisodes: entry.episodes > 0 ? entry.episodes : undefined,
     durationMinutes: entry.durationMinutes || undefined,
-    notes: entry.notes || entry.summary || undefined,
+    notes: entry.notes || undefined,
     tags: entry.tags,
     startDate: entry.startDate || undefined,
     endDate: entry.endDate || undefined,
@@ -588,7 +589,7 @@ function buildDashboardAnimeRecords(entries: StoredAnimeEntry[]): AnimeRecord[] 
     tags: entry.tags,
     cast: entry.cast,
     castAliases: entry.castAliases,
-    summary: entry.summary || entry.notes || undefined,
+    summary: entry.summary || undefined,
     startDate: entry.startDate || undefined,
     endDate: entry.endDate || undefined,
     premiereDate: entry.premiereDate || undefined,
@@ -814,6 +815,10 @@ function resolveStatusForProgress(currentStatus: AnimeStatus, progress: number, 
     return currentStatus === "completed" ? "plan_to_watch" : currentStatus;
   }
 
+  if (currentStatus === "completed" && !totalEpisodes) {
+    return "completed" satisfies AnimeStatus;
+  }
+
   if (currentStatus === "plan_to_watch" || currentStatus === "dropped") {
     return "watching" satisfies AnimeStatus;
   }
@@ -952,7 +957,7 @@ export function upsertDesktopAnimeItem(editingId: number | null, input: DesktopA
   const nextProgress = nextEpisodes > 0 ? Math.min(Math.max(0, input.progress), nextEpisodes) : Math.max(0, input.progress);
   const normalizedStatus = resolveStatusForProgress(input.status, nextProgress, nextEpisodes || undefined);
   const nextEndDate = normalizedStatus === "completed"
-    ? rawEndDate || existingEntry?.endDate || now.slice(0, 10)
+    ? rawEndDate || existingEntry?.endDate || getLocalTodayDateString(now)
     : rawEndDate;
 
   const nextEntry = normalizeStoredEntry({
@@ -1015,12 +1020,15 @@ export function updateDesktopAnimeDetailItem(id: number, input: DesktopAnimeDeta
     ? existingEntry.progress
     : Math.max(0, input.progress);
   const nextProgress = nextEpisodes > 0 ? Math.min(requestedProgress, nextEpisodes) : requestedProgress;
+  const previousStatus = mapStoredStatus(existingEntry.status);
   const nextStatus = resolveStatusForProgress(input.status ?? mapStoredStatus(existingEntry.status), nextProgress, nextEpisodes || undefined);
   const nextStartDate = input.startDate === undefined ? existingEntry.startDate : normalizeOptionalDate(input.startDate);
   const nextPremiereDate = input.premiereDate === undefined ? existingEntry.premiereDate : normalizeOptionalDate(input.premiereDate);
-  const rawEndDate = input.endDate === undefined ? existingEntry.endDate : normalizeOptionalDate(input.endDate);
+  const hasExplicitEndDate = input.endDate !== undefined;
+  const rawEndDate = hasExplicitEndDate ? normalizeOptionalDate(input.endDate) : existingEntry.endDate;
+  const completedNow = nextStatus === "completed" && previousStatus !== "completed";
   const nextEndDate = nextStatus === "completed"
-    ? rawEndDate || existingEntry.endDate || now.slice(0, 10)
+    ? (hasExplicitEndDate ? rawEndDate : (completedNow ? (rawEndDate || getLocalTodayDateString(now)) : rawEndDate))
     : rawEndDate;
 
   const nextEntry = normalizeStoredEntry({
@@ -1109,7 +1117,7 @@ export function recordDesktopAnimeProgress(input: DesktopAnimeProgressRecordInpu
     status: mapUiStatus(nextStatus),
     updatedAt: now,
     lastWatchedAt: shouldWriteHistory ? pickLaterTimestamp(existingEntry.lastWatchedAt, watchedAt) : existingEntry.lastWatchedAt,
-    endDate: nextStatus === "completed" ? existingEntry.endDate || now.slice(0, 10) : existingEntry.endDate,
+    endDate: nextStatus === "completed" ? existingEntry.endDate || getLocalTodayDateString(now) : existingEntry.endDate,
   };
 
   const nextEntries = entries.map((entry, index) => (index === entryIndex ? nextEntry : entry));

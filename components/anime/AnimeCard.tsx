@@ -40,12 +40,33 @@ export default memo(function AnimeCard({ item, onEdit, updateProgress, isAdmin =
     : isCompleted ? 100 : 0;
   const rewatchTag = resolveRewatchTag(item.tags);
   const detailHref = `/anime/${item.id}?returnTo=${encodeURIComponent(detailReturnTo)}`;
+  const handleEdit = () => {
+    if (!isAdmin) {
+      return;
+    }
+
+    onEdit(item);
+  };
 
   return (
-    <div className="group surface-card-muted relative rounded-2xl overflow-hidden hover:border-white/10 transition-all duration-300 hover:shadow-2xl hover:shadow-black/40">
+    <div
+      className={`group surface-card-muted relative rounded-2xl overflow-hidden hover:border-white/10 transition-all duration-300 hover:shadow-2xl hover:shadow-black/40 ${isAdmin ? 'cursor-pointer' : ''}`}
+      onClick={handleEdit}
+      role={isAdmin ? 'button' : undefined}
+      tabIndex={isAdmin ? 0 : undefined}
+      onKeyDown={isAdmin ? ((event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          handleEdit();
+        }
+      }) : undefined}
+    >
       {/* 封面部分 */}
       <div className="relative aspect-[3/4] overflow-hidden bg-zinc-900">
-        <Link href={detailHref} className="block h-full" onClick={onOpenDetail}>
+        <Link href={detailHref} className="block h-full" onClick={(event) => {
+          event.stopPropagation();
+          onOpenDetail();
+        }}>
           {item.coverUrl ? (
             <Image
               src={item.coverUrl}
@@ -109,7 +130,10 @@ export default memo(function AnimeCard({ item, onEdit, updateProgress, isAdmin =
         {/* 快速编辑按钮 */}
         {isAdmin && (
           <button 
-            onClick={() => onEdit(item)}
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit(item);
+            }}
             className="surface-pill absolute top-2 right-2 p-1.5 rounded-full text-white/50 hover:text-white hover:bg-black/40 opacity-0 group-hover:opacity-100 transition-all"
             aria-label="编辑"
           >
@@ -145,7 +169,10 @@ export default memo(function AnimeCard({ item, onEdit, updateProgress, isAdmin =
         {isAdmin && (
           <div className="flex items-center gap-2 pt-1">
             <button 
-              onClick={() => updateProgress(item.id, item.progress - 1, item.totalEpisodes)}
+              onClick={(event) => {
+                event.stopPropagation();
+                void updateProgress(item.id, item.progress - 1, item.totalEpisodes);
+              }}
               disabled={item.progress <= 0}
               className="surface-pill flex-1 py-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition text-[10px] disabled:opacity-30"
               aria-label="减一集"
@@ -158,7 +185,10 @@ export default memo(function AnimeCard({ item, onEdit, updateProgress, isAdmin =
               </div>
             ) : (
                <button 
-                  onClick={() => updateProgress(item.id, item.progress + 1, item.totalEpisodes)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void updateProgress(item.id, item.progress + 1, item.totalEpisodes);
+                  }}
                   className="flex-[2] py-1.5 rounded-lg bg-white text-black hover:opacity-90 transition text-[10px] font-bold flex items-center justify-center gap-1 shadow-sm"
                   aria-label="看一集"
                 >

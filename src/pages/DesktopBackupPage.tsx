@@ -1,4 +1,5 @@
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
+import { formatLocalDateTimeString } from "@/src/lib/local-date-time";
 import {
   createDesktopBackup,
   deleteDesktopBackup,
@@ -29,13 +30,7 @@ function formatSize(bytes: number) {
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleString("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatLocalDateTimeString(iso);
 }
 
 export default function DesktopBackupPage() {

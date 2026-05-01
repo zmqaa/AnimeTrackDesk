@@ -30,14 +30,33 @@ export default memo(function AnimeListView({ items, onEdit, updateProgress, isAd
         const isCompleted = item.status === 'completed';
         const progressPercent = item.totalEpisodes ? (item.progress / item.totalEpisodes) * 100 : 0;
         const detailHref = `/anime/${item.id}?returnTo=${encodeURIComponent(detailReturnTo)}`;
+        const handleEdit = () => {
+          if (!isAdmin) {
+            return;
+          }
+
+          onEdit(item);
+        };
 
         return (
           <div
             key={item.id}
-            className="group surface-card-muted flex items-center gap-4 p-3 rounded-2xl hover:border-white/10 transition-all duration-200"
+            className={`group surface-card-muted flex items-center gap-4 p-3 rounded-2xl hover:border-white/10 transition-all duration-200 ${isAdmin ? 'cursor-pointer' : ''}`}
+            onClick={handleEdit}
+            role={isAdmin ? 'button' : undefined}
+            tabIndex={isAdmin ? 0 : undefined}
+            onKeyDown={isAdmin ? ((event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                handleEdit();
+              }
+            }) : undefined}
           >
             {/* 封面缩略图 */}
-            <Link href={detailHref} onClick={onOpenDetail} className="flex-shrink-0 w-14 h-[74px] rounded-xl overflow-hidden bg-zinc-900 relative">
+            <Link href={detailHref} onClick={(event) => {
+              event.stopPropagation();
+              onOpenDetail();
+            }} className="flex-shrink-0 w-14 h-[74px] rounded-xl overflow-hidden bg-zinc-900 relative">
               {item.coverUrl ? (
                 <Image
                   src={item.coverUrl}
@@ -60,7 +79,10 @@ export default memo(function AnimeListView({ items, onEdit, updateProgress, isAd
 
             {/* 标题与标签 */}
             <div className="flex-1 min-w-0 py-0.5">
-              <Link href={detailHref} onClick={onOpenDetail} className="block">
+              <Link href={detailHref} onClick={(event) => {
+                event.stopPropagation();
+                onOpenDetail();
+              }} className="block">
                 <h3 className="text-sm font-medium text-zinc-100 truncate group-hover:text-emerald-300 transition-colors">
                   {item.title}
                 </h3>
@@ -97,7 +119,10 @@ export default memo(function AnimeListView({ items, onEdit, updateProgress, isAd
             {isAdmin && (
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 <button
-                  onClick={() => updateProgress(item.id, item.progress - 1, item.totalEpisodes)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void updateProgress(item.id, item.progress - 1, item.totalEpisodes);
+                  }}
                   disabled={item.progress <= 0}
                   className="surface-pill p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition text-[10px] disabled:opacity-30"
                   aria-label="减一集"
@@ -110,7 +135,10 @@ export default memo(function AnimeListView({ items, onEdit, updateProgress, isAd
                   </div>
                 ) : (
                   <button
-                    onClick={() => updateProgress(item.id, item.progress + 1, item.totalEpisodes)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void updateProgress(item.id, item.progress + 1, item.totalEpisodes);
+                    }}
                     className="p-1.5 rounded-lg bg-white text-black hover:opacity-90 transition"
                     aria-label="加一集"
                   >
@@ -118,7 +146,10 @@ export default memo(function AnimeListView({ items, onEdit, updateProgress, isAd
                   </button>
                 )}
                 <button
-                  onClick={() => onEdit(item)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onEdit(item);
+                  }}
                   className="surface-pill p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition opacity-0 group-hover:opacity-100"
                   aria-label="编辑"
                 >

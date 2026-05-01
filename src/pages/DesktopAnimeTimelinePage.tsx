@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import type { WatchHistoryRecord } from "@/lib/dashboard-types";
+import { formatLocalTimeString } from "@/src/lib/local-date-time";
 import { loadDesktopWatchHistoryRecords } from "@/src/lib/desktop-anime-store";
 
 export default function DesktopAnimeTimelinePage() {
@@ -74,11 +75,7 @@ export default function DesktopAnimeTimelinePage() {
 
                   <div className="grid gap-2 sm:grid-cols-[112px_minmax(0,1fr)] sm:items-baseline sm:gap-4">
                     <span className="shrink-0 text-xs font-mono text-zinc-500">
-                      {new Date(item.watchedAt).toLocaleDateString("zh-CN", {
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatLocalTimeString(item.watchedAt)}
                     </span>
                     <div className="surface-card-muted rounded-xl p-4 transition-all hover:border-primary/30">
                       <div className="flex items-center justify-between gap-3">

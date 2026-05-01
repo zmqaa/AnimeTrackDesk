@@ -1,5 +1,6 @@
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { normalizeStringArray } from "@/lib/anime-cast";
+import { formatLocalDateString, formatLocalDateTimeString } from "@/src/lib/local-date-time";
 import type { AnimeDetailItem, AnimeStatus } from "@/lib/anime-shared";
 import {
   deleteDesktopAnimeItem,
@@ -17,9 +18,13 @@ import {
   SparklesIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+
+type DateInputHandle = HTMLInputElement & {
+  showPicker?: () => void;
+};
 
 const statusMap: Record<AnimeStatus, string> = {
   watching: "追番中",
@@ -74,15 +79,11 @@ type AnimeDetailFormData = Partial<AnimeDetailItem> & {
 };
 
 function formatDateLabel(value?: string) {
-  return value || "未记录";
+  return formatLocalDateString(value);
 }
 
 function formatTimestampLabel(value?: string) {
-  if (!value) {
-    return "未记录";
-  }
-
-  return value.replace("T", " ").slice(0, 16);
+  return formatLocalDateTimeString(value);
 }
 
 function toTagInputValue(value: AnimeDetailFormData["tags"] | undefined) {
@@ -218,6 +219,9 @@ export default function DesktopAnimeDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const returnTo = useMemo(() => resolveReturnTo(searchParams.get("returnTo")), [searchParams]);
   const canEdit = isAdmin && isEditing;
+  const startDateInputRef = useRef<DateInputHandle | null>(null);
+  const endDateInputRef = useRef<DateInputHandle | null>(null);
+  const premiereDateInputRef = useRef<DateInputHandle | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -254,6 +258,15 @@ export default function DesktopAnimeDetailPage() {
 
   const handleChange = (key: keyof AnimeDetailItem, value: unknown) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const openDatePicker = (input: DateInputHandle | null) => {
+    if (!input) {
+      return;
+    }
+
+    input.focus();
+    input.showPicker?.();
   };
 
   const saveChanges = async () => {
@@ -593,7 +606,7 @@ export default function DesktopAnimeDetailPage() {
                   <div className="surface-card-muted rounded-2xl p-4">
                     <div className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">最近编辑</div>
                     <div className="mt-2 text-sm font-semibold text-zinc-100">{formatTimestampLabel(item.updatedAt)}</div>
-                    <div className="mt-1 text-xs text-zinc-500">创建于 {formatDateLabel(item.createdAt?.slice(0, 10))}</div>
+                    <div className="mt-1 text-xs text-zinc-500">创建于 {formatDateLabel(item.createdAt)}</div>
                   </div>
                 </div>
               </div>
@@ -707,42 +720,69 @@ export default function DesktopAnimeDetailPage() {
                     </div>
 
                     <div className="mt-4 space-y-3 text-sm">
-                      <div className="surface-card-muted flex items-center justify-between gap-4 rounded-2xl px-4 py-3">
+                      <div
+                        className={`surface-card-muted flex items-center justify-between gap-4 rounded-2xl px-4 py-3 ${canEdit ? "cursor-pointer" : ""}`}
+                        onClick={canEdit ? () => openDatePicker(startDateInputRef.current) : undefined}
+                      >
                         <span className="text-zinc-500">开始观看</span>
                         {canEdit ? (
                           <input
+                            ref={startDateInputRef}
                             type="date"
                             value={formData.startDate || ""}
                             onChange={(event) => handleChange("startDate", event.target.value)}
-                            className="surface-input theme-focus-accent rounded-xl px-2 py-1.5 text-sm text-white transition"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openDatePicker(startDateInputRef.current);
+                            }}
+                            onFocus={() => openDatePicker(startDateInputRef.current)}
+                            className="surface-input theme-focus-accent w-[172px] rounded-xl px-2 py-1.5 text-sm text-white transition"
                           />
                         ) : (
                           <span className="text-zinc-100">{formatDateLabel(item.startDate)}</span>
                         )}
                       </div>
 
-                      <div className="surface-card-muted flex items-center justify-between gap-4 rounded-2xl px-4 py-3">
+                      <div
+                        className={`surface-card-muted flex items-center justify-between gap-4 rounded-2xl px-4 py-3 ${canEdit ? "cursor-pointer" : ""}`}
+                        onClick={canEdit ? () => openDatePicker(endDateInputRef.current) : undefined}
+                      >
                         <span className="text-zinc-500">看完日期</span>
                         {canEdit ? (
                           <input
+                            ref={endDateInputRef}
                             type="date"
                             value={formData.endDate || ""}
                             onChange={(event) => handleChange("endDate", event.target.value)}
-                            className="surface-input theme-focus-accent rounded-xl px-2 py-1.5 text-sm text-white transition"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openDatePicker(endDateInputRef.current);
+                            }}
+                            onFocus={() => openDatePicker(endDateInputRef.current)}
+                            className="surface-input theme-focus-accent w-[172px] rounded-xl px-2 py-1.5 text-sm text-white transition"
                           />
                         ) : (
                           <span className="text-zinc-100">{formatDateLabel(item.endDate)}</span>
                         )}
                       </div>
 
-                      <div className="surface-card-muted flex items-center justify-between gap-4 rounded-2xl px-4 py-3">
+                      <div
+                        className={`surface-card-muted flex items-center justify-between gap-4 rounded-2xl px-4 py-3 ${canEdit ? "cursor-pointer" : ""}`}
+                        onClick={canEdit ? () => openDatePicker(premiereDateInputRef.current) : undefined}
+                      >
                         <span className="text-zinc-500">首播日期</span>
                         {canEdit ? (
                           <input
+                            ref={premiereDateInputRef}
                             type="date"
                             value={formData.premiereDate || ""}
                             onChange={(event) => handleChange("premiereDate", event.target.value)}
-                            className="surface-input theme-focus-accent rounded-xl px-2 py-1.5 text-sm text-white transition"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openDatePicker(premiereDateInputRef.current);
+                            }}
+                            onFocus={() => openDatePicker(premiereDateInputRef.current)}
+                            className="surface-input theme-focus-accent w-[172px] rounded-xl px-2 py-1.5 text-sm text-white transition"
                           />
                         ) : (
                           <span className="text-zinc-100">{formatDateLabel(item.premiereDate)}</span>

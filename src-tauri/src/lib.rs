@@ -155,7 +155,6 @@ async fn parse_desktop_quick_record(
       "premiereDate": "YYYY-MM-DD，可空",
       "status": "watching|completed|dropped|plan_to_watch|null",
       "score": null,
-      "notes": null,
       "tags": [],
       "totalEpisodes": null,
       "durationMinutes": null,
@@ -179,7 +178,8 @@ async fn parse_desktop_quick_record(
 6. 只有明确提到的信息才能填写；不知道就留空，不要编造。
 7. 以前/之前/小时候/很久前/早就 这类时间线索，isHistorical=true；没给具体日期时 watchedAt 留空。
 8. 二刷/重刷/重温/再刷 写到 rewatchTag。
-9. 完全识别不出来时返回 {{"records": []}}。"#),
+9. 不要生成个人备注、观后感、主观短评，这些不属于 AI 快速录入字段。
+10. 完全识别不出来时返回 {{"records": []}}。"#),
       }
     ],
     "temperature": 0.1
