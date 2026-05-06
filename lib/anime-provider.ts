@@ -15,6 +15,26 @@ export interface AnimeMetadata {
     tags?: string[];
 }
 
+export interface AnimeMetadataCandidate {
+    id: number;
+    title: string;
+    originalTitle?: string;
+    score: number;
+    season?: number;
+}
+
+export interface AnimeMetadataQueryTrace {
+    query: string;
+    candidateCount: number;
+    candidates: AnimeMetadataCandidate[];
+    selected?: AnimeMetadataCandidate;
+}
+
+export interface AnimeMetadataLookupResult {
+    metadata: AnimeMetadata | null;
+    trace: AnimeMetadataQueryTrace[];
+}
+
 function normalizeDateString(value: Date | string | number | null | undefined) {
     if (!value) {
         return undefined;
@@ -139,14 +159,13 @@ async function fetchSubjectCharacters(subjectId: number): Promise<BangumiV0Chara
     }
 }
 
-/** 从搜索结果中挑出最佳匹配：优先 name 精确匹配，次选 partial，保持与查询词的一致性 */
-function pickBestMatch(candidates: BangumiV0Subject[], keyword: string): BangumiV0Subject | null {
-    if (candidates.length === 0) return null;
+function scoreBangumiCandidates(candidates: BangumiV0Subject[], keyword: string) {
+    if (candidates.length === 0) return [] as Array<{ subject: BangumiV0Subject; score: number; season?: number }>;
     const keywordToken = normalizeTitleToken(keyword);
     const keywordBaseToken = normalizeTitleToken(stripSeasonToken(keyword));
     const keywordSeason = extractSeasonNumber(keyword);
 
-    const scored = candidates
+    return candidates
         .map((subject) => {
             const titleToken = normalizeTitleToken(subject.name);
             const titleCnToken = normalizeTitleToken(subject.name_cn);
@@ -174,6 +193,21 @@ function pickBestMatch(candidates: BangumiV0Subject[], keyword: string): Bangumi
             return { subject, score };
         })
         .sort((left, right) => right.score - left.score);
+}
+
+function toAnimeMetadataCandidate(candidate: { subject: BangumiV0Subject; score: number }): AnimeMetadataCandidate {
+    return {
+        id: candidate.subject.id,
+        title: candidate.subject.name_cn || candidate.subject.name,
+        originalTitle: candidate.subject.name,
+        score: candidate.score,
+        season: extractSeasonNumber(candidate.subject.name_cn) ?? extractSeasonNumber(candidate.subject.name),
+    };
+}
+
+/** 从搜索结果中挑出最佳匹配：优先 name 精确匹配，次选 partial，保持与查询词的一致性 */
+function pickBestMatch(candidates: BangumiV0Subject[], keyword: string): BangumiV0Subject | null {
+    const scored = scoreBangumiCandidates(candidates, keyword);
 
     return scored[0] && scored[0].score > 0 ? scored[0].subject : null;
 }
@@ -230,22 +264,33 @@ export async function fetchAnimeMetadata(title: string): Promise<AnimeMetadata |
     return fetchAnimeMetadataByQueries(title);
 }
 
-export async function fetchAnimeMetadataByQueries(
+export async function fetchAnimeMetadataByQueriesWithTrace(
     ...queries: Array<string | undefined | null>
-): Promise<AnimeMetadata | null> {
+): Promise<AnimeMetadataLookupResult> {
     const validQueries = queries.map(q => (q ?? '').trim()).filter(Boolean);
-    if (validQueries.length === 0) return null;
+    if (validQueries.length === 0) {
+        return { metadata: null, trace: [] };
+    }
+
+    const trace: AnimeMetadataQueryTrace[] = [];
 
     for (const keyword of validQueries) {
         const candidates = await searchBangumiV0(keyword);
-        if (candidates.length === 0) continue;
+        const scoredCandidates = scoreBangumiCandidates(candidates, keyword);
+        const selected = scoredCandidates[0] && scoredCandidates[0].score > 0 ? scoredCandidates[0] : null;
 
-        const subject = pickBestMatch(candidates, keyword);
-        if (!subject) continue;
+        trace.push({
+            query: keyword,
+            candidateCount: candidates.length,
+            candidates: scoredCandidates.slice(0, 4).map(toAnimeMetadataCandidate),
+            selected: selected ? toAnimeMetadataCandidate(selected) : undefined,
+        });
+
+        if (!selected) continue;
 
         const [detail, characters] = await Promise.all([
-            fetchSubjectDetail(subject.id),
-            fetchSubjectCharacters(subject.id),
+            fetchSubjectDetail(selected.subject.id),
+            fetchSubjectCharacters(selected.subject.id),
         ]);
 
         if (!detail) continue;
@@ -263,22 +308,32 @@ export async function fetchAnimeMetadataByQueries(
             })();
 
         return {
-            title: detail.name_cn || detail.name,
-            originalTitle: detail.name,
-            coverUrl: detail.images?.large ?? detail.images?.common ?? detail.images?.medium,
-            score: detail.rating?.score && detail.rating.score > 0
-                ? Math.round(detail.rating.score * 10) / 10
-                : undefined,
-            durationMinutes: extractDurationMinutes(detail),
-            totalEpisodes,
-            description: detail.summary?.trim() || undefined,
-            premiereDate: normalizeDate(detail.date),
-            tags,
-            isFinished: extractIsFinished(detail),
-            cast: extractCast(characters),
+            metadata: {
+                title: detail.name_cn || detail.name,
+                originalTitle: detail.name,
+                coverUrl: detail.images?.large ?? detail.images?.common ?? detail.images?.medium,
+                score: detail.rating?.score && detail.rating.score > 0
+                    ? Math.round(detail.rating.score * 10) / 10
+                    : undefined,
+                durationMinutes: extractDurationMinutes(detail),
+                totalEpisodes,
+                description: detail.summary?.trim() || undefined,
+                premiereDate: normalizeDate(detail.date),
+                tags,
+                isFinished: extractIsFinished(detail),
+                cast: extractCast(characters),
+            },
+            trace,
         };
     }
 
-    return null;
+    return { metadata: null, trace };
+}
+
+export async function fetchAnimeMetadataByQueries(
+    ...queries: Array<string | undefined | null>
+): Promise<AnimeMetadata | null> {
+    const result = await fetchAnimeMetadataByQueriesWithTrace(...queries);
+    return result.metadata;
 }
 

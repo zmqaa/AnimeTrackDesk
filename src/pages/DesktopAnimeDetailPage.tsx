@@ -1,10 +1,12 @@
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { normalizeStringArray } from "@/lib/anime-cast";
+import { analyzeAnimePreferenceInsight } from "@/src/lib/anime-preference-insights";
 import { formatLocalDateString, formatLocalDateTimeString } from "@/src/lib/local-date-time";
 import type { AnimeDetailItem, AnimeStatus } from "@/lib/anime-shared";
 import {
   deleteDesktopAnimeItem,
   loadDesktopAnimeDetailItem,
+  loadDesktopAnimeListItems,
   type DesktopAnimeDetailPatchInput,
   updateDesktopAnimeDetailItem,
 } from "@/src/lib/desktop-anime-store";
@@ -14,6 +16,7 @@ import {
   CalendarIcon,
   CheckCircleIcon,
   ClockIcon,
+  ExclamationTriangleIcon,
   PencilSquareIcon,
   SparklesIcon,
   TrashIcon,
@@ -373,6 +376,31 @@ export default function DesktopAnimeDetailPage() {
   const progressPercent = displayTotalEpisodes && displayTotalEpisodes > 0
     ? Math.min(100, (displayProgress / displayTotalEpisodes) * 100)
     : (displayStatus === "completed" ? 100 : Math.min(displayProgress * 8, 100));
+  const preferenceInsight = useMemo(() => {
+    if (!item) {
+      return null;
+    }
+
+    return analyzeAnimePreferenceInsight(
+      {
+        ...item,
+        tags: displayTags,
+        summary: typeof formData.summary === "string" ? formData.summary : item.summary,
+      },
+      loadDesktopAnimeListItems(),
+    );
+  }, [displayTags, formData.summary, item]);
+
+  const insightToneStyles = preferenceInsight?.tone === "warning"
+    ? "border-rose-400/30 bg-rose-500/10"
+    : preferenceInsight?.tone === "mixed"
+      ? "border-amber-400/30 bg-amber-500/10"
+      : "border-emerald-400/30 bg-emerald-500/10";
+  const insightIconStyles = preferenceInsight?.tone === "warning"
+    ? "text-rose-200"
+    : preferenceInsight?.tone === "mixed"
+      ? "text-amber-200"
+      : "text-emerald-200";
 
   if (loading) {
     return <div className="p-12 text-center text-zinc-500 font-mono">LOADING_DETAILS...</div>;
@@ -609,6 +637,45 @@ export default function DesktopAnimeDetailPage() {
                     <div className="mt-1 text-xs text-zinc-500">创建于 {formatDateLabel(item.createdAt)}</div>
                   </div>
                 </div>
+
+                {preferenceInsight ? (
+                  <div className={`mt-6 rounded-[24px] border p-5 ${insightToneStyles}`}>
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-zinc-200/90">
+                          <ExclamationTriangleIcon className={`h-4 w-4 ${insightIconStyles}`} />
+                          口味雷达
+                        </div>
+                        <h3 className="text-xl font-semibold text-white">{preferenceInsight.headline}</h3>
+                        <p className="max-w-3xl text-sm leading-7 text-zinc-200/85">{preferenceInsight.message}</p>
+                        <p className="text-xs leading-6 text-zinc-300/70">{preferenceInsight.profileSummary}</p>
+                      </div>
+
+                      {preferenceInsight.favoriteTags.length > 0 ? (
+                        <div className="surface-card-muted min-w-[240px] rounded-2xl p-4">
+                          <div className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">你的高频标签</div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {preferenceInsight.favoriteTags.slice(0, 5).map((tag) => (
+                              <span key={tag} className="surface-pill rounded-full px-3 py-1 text-xs text-zinc-200">
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {preferenceInsight.reasonBadges.length > 0 ? (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {preferenceInsight.reasonBadges.map((badge) => (
+                          <span key={badge} className="rounded-full border border-white/10 bg-black/15 px-3 py-1 text-xs text-zinc-200/80">
+                            {badge}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
 
               <div className="grid gap-6 xl:grid-cols-[minmax(0,1.28fr)_minmax(320px,0.92fr)] 2xl:grid-cols-[minmax(0,1.4fr)_minmax(360px,0.95fr)] 2xl:gap-8">

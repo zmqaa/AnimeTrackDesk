@@ -9,7 +9,7 @@ import AnimePagination from "@/app/anime/AnimePagination";
 import AnimeQuickRecordPanel from "@/app/anime/AnimeQuickRecordPanel";
 import AnimeSidebar from "@/app/anime/AnimeSidebar";
 import { buildQuickRecordMessage, buildRecentWatchItems, buildTagPreferences, buildVoiceActorSuggestions, filterAndSortAnimeItems, type QuickRecordResponse } from "@/app/anime/anime-page-helpers";
-import { quickRecordDesktopAnimeFromText } from "@/src/lib/desktop-ai-quick-record";
+import { quickRecordDesktopAnimeFromText, type DesktopQuickRecordTraceEvent } from "@/src/lib/desktop-ai-quick-record";
 import { deleteDesktopAnimeItem, loadDesktopAnimeListItems, type DesktopAnimeUpsertInput, upsertDesktopAnimeItem, updateDesktopAnimeProgress } from "@/src/lib/desktop-anime-store";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -47,6 +47,7 @@ export default function DesktopAnimePage() {
   const [quickInput, setQuickInput] = useState("");
   const [quickLoading, setQuickLoading] = useState(false);
   const [quickMessage, setQuickMessage] = useState("");
+  const [quickTrace, setQuickTrace] = useState<DesktopQuickRecordTraceEvent[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<AnimeSortBy>("lastWatchedAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -219,14 +220,20 @@ export default function DesktopAnimePage() {
     const text = quickInput.trim();
     if (!text) {
       setQuickMessage("请输入一句话记录");
+      setQuickTrace([]);
       return;
     }
 
     setQuickLoading(true);
     setQuickMessage("");
+    setQuickTrace([]);
 
     try {
-      const data: QuickRecordResponse = await quickRecordDesktopAnimeFromText(text);
+      const data: QuickRecordResponse = await quickRecordDesktopAnimeFromText(text, {
+        onTrace: (event) => {
+          setQuickTrace((current) => [...current, event]);
+        },
+      });
       setItems(loadDesktopAnimeListItems());
       setQuickInput("");
       setQuickMessage(buildQuickRecordMessage(data));
@@ -326,6 +333,7 @@ export default function DesktopAnimePage() {
           quickInput={quickInput}
           quickLoading={quickLoading}
           quickMessage={quickMessage}
+          quickTrace={quickTrace}
           onInputChange={setQuickInput}
           onSubmit={handleQuickRecord}
         />
