@@ -1,15 +1,16 @@
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
-import { formatLocalDateTimeString } from "@/src/lib/local-date-time";
+import { formatLocalDateTimeString } from "@/lib/local-date-time";
 import {
-  createDesktopBackup,
-  deleteDesktopBackup,
-  downloadDesktopBackup,
-  exportDesktopData,
-  listDesktopBackups,
-  restoreDesktopBackup,
-  restoreDesktopDataFromText,
-  type DesktopBackupFile,
-} from "@/src/lib/desktop-backup-store";
+  clearData,
+  createBackup,
+  deleteBackup,
+  downloadBackup,
+  exportData,
+  listBackups,
+  restoreBackup,
+  restoreDataFromText,
+  type BackupFile,
+} from "@/src/lib/backup-store";
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -33,20 +34,22 @@ function formatDate(iso: string) {
   return formatLocalDateTimeString(iso);
 }
 
-export default function DesktopBackupPage() {
-  const [backups, setBackups] = useState<DesktopBackupFile[]>([]);
+export default function BackupPage() {
+  const [backups, setBackups] = useState<BackupFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [exporting, setExporting] = useState<"json" | "csv" | null>(null);
   const [importing, setImporting] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [clearConfirm, setClearConfirm] = useState(false);
   const [restoreConfirm, setRestoreConfirm] = useState<RestoreCandidate | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const refreshBackups = useCallback(async () => {
     setLoading(true);
     try {
-      setBackups(await listDesktopBackups());
+      setBackups(await listBackups());
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "加载备份列表失败");
     } finally {
@@ -61,7 +64,7 @@ export default function DesktopBackupPage() {
   const handleCreateBackup = useCallback(async () => {
     setCreating(true);
     try {
-      const backup = await createDesktopBackup();
+      const backup = await createBackup();
       await refreshBackups();
       toast.success(`已创建快照 ${backup.name}`);
     } catch (error) {
@@ -74,7 +77,7 @@ export default function DesktopBackupPage() {
   const handleExport = useCallback(async (format: "json" | "csv") => {
     setExporting(format);
     try {
-      const result = await exportDesktopData(format);
+      const result = await exportData(format);
       if (result.canceled) {
         return;
       }
@@ -91,7 +94,7 @@ export default function DesktopBackupPage() {
 
   const handleDownload = useCallback(async (name: string) => {
     try {
-      const result = await downloadDesktopBackup(name);
+      const result = await downloadBackup(name);
       if (result.canceled) {
         return;
       }
@@ -104,7 +107,7 @@ export default function DesktopBackupPage() {
 
   const handleDeleteBackup = useCallback(async (name: string) => {
     try {
-      await deleteDesktopBackup(name);
+      await deleteBackup(name);
       await refreshBackups();
       toast.success("已删除快照");
     } catch (error) {
@@ -146,8 +149,8 @@ export default function DesktopBackupPage() {
     setImporting(true);
     try {
       const result = restoreConfirm.type === "backup"
-        ? await restoreDesktopBackup(restoreConfirm.name)
-        : await restoreDesktopDataFromText(restoreConfirm.content);
+        ? await restoreBackup(restoreConfirm.name)
+        : await restoreDataFromText(restoreConfirm.content);
 
       await refreshBackups();
       toast.success(`已恢复 ${result.animeCount} 部番剧和 ${result.historyCount} 条历史`);
@@ -158,6 +161,19 @@ export default function DesktopBackupPage() {
       setRestoreConfirm(null);
     }
   }, [refreshBackups, restoreConfirm]);
+
+  const handleClearData = useCallback(async () => {
+    setClearing(true);
+    try {
+      await clearData();
+      toast.success("已清空当前番剧与观看历史");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "清空失败");
+    } finally {
+      setClearing(false);
+      setClearConfirm(false);
+    }
+  }, []);
 
   return (
     <main className="p-4 md:p-8 space-y-8">
@@ -201,19 +217,34 @@ export default function DesktopBackupPage() {
       <section className="glass-panel rounded-3xl border border-white/5 p-6 md:p-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
           <h2 className="text-lg font-medium text-zinc-200">导入恢复</h2>
-          <button
-            onClick={handleChooseImportFile}
-            disabled={importing}
-            className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm font-medium hover:bg-amber-500/20 transition-all disabled:opacity-50 w-fit"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 12h10m-10 5h16" />
-            </svg>
-            选择 JSON 文件
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={handleChooseImportFile}
+              disabled={importing || clearing}
+              className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm font-medium hover:bg-amber-500/20 transition-all disabled:opacity-50 w-fit"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 12h10m-10 5h16" />
+              </svg>
+              选择 JSON 文件
+            </button>
+            <button
+              onClick={() => setClearConfirm(true)}
+              disabled={importing || clearing}
+              className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm font-medium hover:bg-red-500/20 transition-all disabled:opacity-50 w-fit"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 7h12m-9 4v6m6-6v6M9 4h6l1 3H8l1-3Zm-3 3h14l-1 12a2 2 0 01-2 2H7a2 2 0 01-2-2L4 7Z" />
+              </svg>
+              {clearing ? "清空中..." : "清空当前数据"}
+            </button>
+          </div>
         </div>
         <p className="text-sm text-zinc-500 mb-6">
           支持导入本页导出的 JSON 文件，或从下方下载的桌面快照文件。恢复会覆盖当前桌面端数据，CSV 只用于查看，不支持直接导入。
+        </p>
+        <p className="text-xs text-zinc-500/90 mb-6">
+          如果这台设备之后要交给别人使用，可以先点“清空当前数据”恢复为空库。下方已经保存的本地快照不会自动删除，如需彻底移交，请一并删除。
         </p>
         <input
           ref={fileInputRef}
@@ -319,6 +350,16 @@ export default function DesktopBackupPage() {
         confirmText={importing ? "恢复中..." : "确认恢复"}
         onConfirm={confirmRestore}
         onCancel={() => !importing && setRestoreConfirm(null)}
+      />
+
+      <ConfirmDialog
+        open={clearConfirm}
+        title="清空当前数据"
+        message="确定要清空当前番剧与观看历史吗？这会把当前使用中的数据恢复为空库，但不会自动删除下方已有的本地快照。"
+        confirmText={clearing ? "清空中..." : "确认清空"}
+        variant="danger"
+        onConfirm={handleClearData}
+        onCancel={() => !clearing && setClearConfirm(false)}
       />
     </main>
   );

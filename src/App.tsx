@@ -2,27 +2,28 @@ import SidebarLayout from "@/components/SidebarLayout";
 import ErrorBoundary from "@/components/shared/ErrorBoundary";
 import Toast from "@/components/shared/Toast";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
-import { hydrateDesktopAnimeStore } from "@/src/lib/desktop-anime-store";
+import { hydrateAnimeStore } from "@/src/lib/anime-store";
 import { Suspense, lazy, type ReactNode, useEffect, useState } from "react";
 import { HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 const Dashboard = lazy(() => import("@/components/Dashboard"));
 const AnimeAtlasPage = lazy(() => import("@/app/anime/atlas/page"));
 const AnimeSeasonsPage = lazy(() => import("@/app/anime/seasons/page"));
-const DesktopAdminPage = lazy(() => import("@/src/pages/DesktopAdminPage"));
-const DesktopAnimeDetailPage = lazy(() => import("@/src/pages/DesktopAnimeDetailPage"));
-const DesktopBackupPage = lazy(() => import("@/src/pages/DesktopBackupPage"));
-const DesktopAnimePage = lazy(() => import("@/src/pages/DesktopAnimePage"));
-const DesktopSettingsPage = lazy(() => import("@/src/pages/DesktopSettingsPage"));
-const DesktopAnimeTimelinePage = lazy(() => import("@/src/pages/DesktopAnimeTimelinePage"));
+const AdminPage = lazy(() => import("@/src/pages/AdminPage"));
+const AnimeDetailPage = lazy(() => import("@/src/pages/AnimeDetailPage"));
+const BackupPage = lazy(() => import("@/src/pages/BackupPage"));
+const AnimePage = lazy(() => import("@/src/pages/AnimePage"));
+const AnimeRecommendationsPage = lazy(() => import("@/src/pages/AnimeRecommendationsPage"));
+const SettingsPage = lazy(() => import("@/src/pages/SettingsPage"));
+const AnimeTimelinePage = lazy(() => import("@/src/pages/AnimeTimelinePage"));
 
-function DesktopDataBootstrap({ children }: { children: ReactNode }) {
+function AppDataBootstrap({ children }: { children: ReactNode }) {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
-    void hydrateDesktopAnimeStore()
+    void hydrateAnimeStore()
       .catch(() => null)
       .finally(() => {
         if (mounted) {
@@ -43,10 +44,10 @@ function DesktopDataBootstrap({ children }: { children: ReactNode }) {
     <div className="p-4 lg:p-8 pb-20">
       <section className="glass-panel-strong rounded-[32px] p-8 lg:p-10 space-y-5 max-w-4xl">
         <div className="space-y-2">
-          <p className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Desktop Repository</p>
+          <p className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Local Repository</p>
           <h1 className="text-3xl font-display text-zinc-100 tracking-tight">正在连接本地番剧仓储</h1>
           <p className="text-zinc-400 leading-7 max-w-2xl">
-            当前会优先从 Tauri SQLite 载入番剧、历史和缓存快照；如果当前环境还没有桌面命令层，就会自动回退到本地缓存继续渲染。
+            当前会优先从 Tauri SQLite 载入番剧、历史和缓存快照；如果当前环境还没有本地命令层，就会自动回退到本地缓存继续渲染。
           </p>
         </div>
 
@@ -69,10 +70,10 @@ function MigrationPlaceholder() {
     <div className="p-4 lg:p-8 pb-20">
       <section className="glass-panel-strong rounded-[32px] p-8 lg:p-10 space-y-5 max-w-4xl">
         <div className="space-y-2">
-          <p className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Desktop Migration</p>
+          <p className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Migration Route</p>
           <h1 className="text-3xl font-display text-zinc-100 tracking-tight">这个页面正在按原项目界面迁移</h1>
           <p className="text-zinc-400 leading-7 max-w-2xl">
-            当前总览、番剧列表、详情、时间轴、分析页、设置页、备份页和管理页都已经接入桌面端。这个路由后续会继续沿用原有信息架构和视觉语言，只是底层能力会逐步切到本地 SQLite 和 Tauri。
+            当前总览、番剧列表、详情、时间轴、分析页、设置页、备份页和管理页都已经接入当前应用。这个路由后续会继续沿用原有信息架构和视觉语言，只是底层能力会逐步切到本地 SQLite 和 Tauri。
           </p>
         </div>
 
@@ -91,7 +92,7 @@ function RoutePendingState() {
     <div className="p-4 lg:p-8 pb-20">
       <section className="glass-panel-strong rounded-[32px] p-8 lg:p-10 space-y-5 max-w-4xl">
         <div className="space-y-2">
-          <p className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Desktop Route</p>
+          <p className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Route Module</p>
           <h1 className="text-3xl font-display text-zinc-100 tracking-tight">正在加载页面模块</h1>
           <p className="text-zinc-400 leading-7 max-w-2xl">
             主路由现在按页面拆分加载，避免首页把图表、管理页、备份页和详情页全部打进首屏入口。
@@ -117,14 +118,15 @@ function AppRoutes() {
         <Suspense fallback={<RoutePendingState />}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/anime" element={<DesktopAnimePage />} />
-            <Route path="/anime/:id" element={<DesktopAnimeDetailPage />} />
+            <Route path="/anime" element={<AnimePage />} />
+            <Route path="/anime/:id" element={<AnimeDetailPage />} />
+            <Route path="/anime/recommendations" element={<AnimeRecommendationsPage />} />
             <Route path="/anime/atlas" element={<AnimeAtlasPage />} />
             <Route path="/anime/seasons" element={<AnimeSeasonsPage />} />
-            <Route path="/anime/timeline" element={<DesktopAnimeTimelinePage />} />
-            <Route path="/settings" element={<DesktopSettingsPage />} />
-            <Route path="/admin" element={<DesktopAdminPage />} />
-            <Route path="/backup" element={<DesktopBackupPage />} />
+            <Route path="/anime/timeline" element={<AnimeTimelinePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/backup" element={<BackupPage />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="/register" element={<Navigate to="/" replace />} />
             <Route path="/setup" element={<Navigate to="/" replace />} />
@@ -141,9 +143,9 @@ export default function App() {
     <HashRouter>
       <ThemeProvider>
         <Toast />
-        <DesktopDataBootstrap>
+        <AppDataBootstrap>
           <AppRoutes />
-        </DesktopDataBootstrap>
+        </AppDataBootstrap>
       </ThemeProvider>
     </HashRouter>
   );

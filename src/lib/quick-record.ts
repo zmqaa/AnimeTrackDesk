@@ -1,4 +1,4 @@
-import type { QuickRecordResponse } from "@/app/anime/anime-page-helpers";
+import type { QuickRecordResponse } from "@/src/features/anime/anime-page-helpers";
 import { uniqueStrings } from "@/lib/anime-cast";
 import { fetchAnimeMetadataByQueriesWithTrace, type AnimeMetadataCandidate } from "@/lib/anime-provider";
 import type { AnimeDetailItem, AnimeListItem, AnimeStatus } from "@/lib/anime-shared";
@@ -21,13 +21,13 @@ import {
   toStringArray,
 } from "@/lib/ai-validation";
 import {
-  loadDesktopAnimeDetailItem,
-  loadDesktopAnimeListItems,
-  recordDesktopAnimeProgress,
-  updateDesktopAnimeDetailItem,
-  upsertDesktopAnimeItem,
-} from "@/src/lib/desktop-anime-store";
-import { loadDesktopSettings, type DesktopAiProviderSettings } from "@/src/lib/desktop-settings-store";
+  loadAnimeDetailItem,
+  loadAnimeListItems,
+  recordAnimeProgress,
+  updateAnimeDetailItem,
+  upsertAnimeItem,
+} from "@/src/lib/anime-store";
+import { loadSettings, type AiProviderSettings } from "@/src/lib/settings-store";
 
 type ParsedQuickRecordTitleKind = "official" | "generic-season";
 type ParsedQuickRecordStatus = "watching" | "completed" | "dropped" | "plan_to_watch";
@@ -60,7 +60,7 @@ type ParsedQuickRecordBatch = {
   records: ParsedQuickRecordIntent[];
 };
 
-type DesktopQuickRecordResult = {
+type QuickRecordResult = {
   created: boolean;
   replay: boolean;
   rewatchTag?: string;
@@ -70,7 +70,7 @@ type DesktopQuickRecordResult = {
   entry: AnimeDetailItem;
 };
 
-type DesktopQuickRecordAiMetadata = {
+type QuickRecordAiMetadata = {
   title?: string;
   originalTitle?: string;
   totalEpisodes?: number;
@@ -82,7 +82,7 @@ type DesktopQuickRecordAiMetadata = {
   coverUrl?: string;
 };
 
-type DesktopQuickRecordMetadata = Awaited<ReturnType<typeof fetchAnimeMetadataByQueriesWithTrace>>["metadata"] & {
+type QuickRecordMetadata = Awaited<ReturnType<typeof fetchAnimeMetadataByQueriesWithTrace>>["metadata"] & {
   title?: string;
   originalTitle?: string;
   totalEpisodes?: number;
@@ -94,14 +94,14 @@ type DesktopQuickRecordMetadata = Awaited<ReturnType<typeof fetchAnimeMetadataBy
   tags?: string[];
 };
 
-type DesktopQuickRecordCommand = "parse_desktop_quick_record" | "enrich_desktop_anime_metadata";
+type QuickRecordCommand = "parse_quick_record" | "enrich_anime_metadata";
 
-export type DesktopQuickRecordTraceStage = "parse" | "match" | "metadata" | "write" | "complete" | "error";
-export type DesktopQuickRecordTraceStatus = "running" | "success" | "warning" | "error";
+export type QuickRecordTraceStage = "parse" | "match" | "metadata" | "write" | "complete" | "error";
+export type QuickRecordTraceStatus = "running" | "success" | "warning" | "error";
 
-export type DesktopQuickRecordTraceEvent = {
-  stage: DesktopQuickRecordTraceStage;
-  status: DesktopQuickRecordTraceStatus;
+export type QuickRecordTraceEvent = {
+  stage: QuickRecordTraceStage;
+  status: QuickRecordTraceStatus;
   title: string;
   detail?: string;
   recordTitle?: string;
@@ -114,15 +114,15 @@ export type DesktopQuickRecordTraceEvent = {
   timestamp: number;
 };
 
-type DesktopQuickRecordTraceReporter = (event: DesktopQuickRecordTraceEvent) => void;
+type QuickRecordTraceReporter = (event: QuickRecordTraceEvent) => void;
 
-type DesktopQuickRecordOptions = {
-  onTrace?: DesktopQuickRecordTraceReporter;
+type QuickRecordOptions = {
+  onTrace?: QuickRecordTraceReporter;
 };
 
 const QUICK_RECORD_HISTORY_NOTE = "通过桌面端 AI 录入补记了观看记录。";
 
-function emitDesktopQuickRecordTrace(reporter: DesktopQuickRecordTraceReporter | undefined, event: Omit<DesktopQuickRecordTraceEvent, "timestamp">) {
+function emitQuickRecordTrace(reporter: QuickRecordTraceReporter | undefined, event: Omit<QuickRecordTraceEvent, "timestamp">) {
   reporter?.({
     ...event,
     timestamp: Date.now(),
@@ -626,7 +626,7 @@ function normalizeQuickRecordBatchPayload(payload: Record<string, unknown>): Par
   };
 }
 
-async function invokeDesktopQuickRecordCommand<T>(command: DesktopQuickRecordCommand, args?: Record<string, unknown>) {
+async function invokeQuickRecordCommand<T>(command: QuickRecordCommand, args?: Record<string, unknown>) {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     return await invoke<T>(command, args);
@@ -635,7 +635,7 @@ async function invokeDesktopQuickRecordCommand<T>(command: DesktopQuickRecordCom
   }
 }
 
-function ensureDesktopQuickRecordAiSettings(value: DesktopAiProviderSettings) {
+function ensureQuickRecordAiSettings(value: AiProviderSettings) {
   if (!value.enabled) {
     throw new Error("请先在设置页启用 AI Provider，然后再使用 AI 录入。");
   }
@@ -645,7 +645,7 @@ function ensureDesktopQuickRecordAiSettings(value: DesktopAiProviderSettings) {
   }
 }
 
-function hasReadyDesktopQuickRecordAiSettings(value: DesktopAiProviderSettings) {
+function hasReadyQuickRecordAiSettings(value: AiProviderSettings) {
   return value.enabled
     && Boolean(value.provider.trim())
     && Boolean(value.baseUrl.trim())
@@ -653,7 +653,7 @@ function hasReadyDesktopQuickRecordAiSettings(value: DesktopAiProviderSettings) 
     && Boolean(value.apiKey.trim());
 }
 
-function normalizeDesktopQuickRecordAiMetadataPayload(value: unknown): DesktopQuickRecordAiMetadata | null {
+function normalizeQuickRecordAiMetadataPayload(value: unknown): QuickRecordAiMetadata | null {
   if (!value || typeof value !== "object") {
     return null;
   }
@@ -672,20 +672,20 @@ function normalizeDesktopQuickRecordAiMetadataPayload(value: unknown): DesktopQu
   };
 }
 
-async function fetchDesktopQuickRecordAiMetadata(queryName: string, settings: DesktopAiProviderSettings) {
-  if (!hasReadyDesktopQuickRecordAiSettings(settings)) {
+async function fetchQuickRecordAiMetadata(queryName: string, settings: AiProviderSettings) {
+  if (!hasReadyQuickRecordAiSettings(settings)) {
     return null;
   }
 
-  const response = await invokeDesktopQuickRecordCommand<Record<string, unknown>>("enrich_desktop_anime_metadata", {
+  const response = await invokeQuickRecordCommand<Record<string, unknown>>("enrich_anime_metadata", {
     queryName,
     settings,
   });
 
-  return normalizeDesktopQuickRecordAiMetadataPayload(response);
+  return normalizeQuickRecordAiMetadataPayload(response);
 }
 
-function buildDesktopQuickRecordProviderQueries(parsed: ParsedQuickRecordIntent, aiMetadata: DesktopQuickRecordAiMetadata | null) {
+function buildQuickRecordProviderQueries(parsed: ParsedQuickRecordIntent, aiMetadata: QuickRecordAiMetadata | null) {
   return Array.from(
     new Set(
       [
@@ -700,13 +700,13 @@ function buildDesktopQuickRecordProviderQueries(parsed: ParsedQuickRecordIntent,
   );
 }
 
-async function parseDesktopQuickRecordBatch(inputText: string, settings: DesktopAiProviderSettings): Promise<ParsedQuickRecordBatch> {
+async function parseQuickRecordBatch(inputText: string, settings: AiProviderSettings): Promise<ParsedQuickRecordBatch> {
   const normalizedText = inputText.trim();
   if (!normalizedText) {
     return { records: [] };
   }
 
-  const response = await invokeDesktopQuickRecordCommand<Record<string, unknown>>("parse_desktop_quick_record", {
+  const response = await invokeQuickRecordCommand<Record<string, unknown>>("parse_quick_record", {
     text: normalizedText,
     settings,
   });
@@ -840,12 +840,12 @@ function buildMetadataEnrichedFlag(parsed: ParsedQuickRecordIntent, detail: Anim
   );
 }
 
-async function enrichMetadata(parsed: ParsedQuickRecordIntent, settings: DesktopAiProviderSettings) {
-  const queries = buildDesktopQuickRecordProviderQueries(parsed, null);
+async function enrichMetadata(parsed: ParsedQuickRecordIntent, settings: AiProviderSettings) {
+  const queries = buildQuickRecordProviderQueries(parsed, null);
 
   try {
-    const aiMetadata = await fetchDesktopQuickRecordAiMetadata(parsed.originalTitle?.trim() || parsed.animeTitle.trim(), settings);
-    const providerQueries = buildDesktopQuickRecordProviderQueries(parsed, aiMetadata);
+    const aiMetadata = await fetchQuickRecordAiMetadata(parsed.originalTitle?.trim() || parsed.animeTitle.trim(), settings);
+    const providerQueries = buildQuickRecordProviderQueries(parsed, aiMetadata);
     const providerResult = await fetchAnimeMetadataByQueriesWithTrace(...providerQueries);
     const providerMetadata = providerResult.metadata;
 
@@ -858,7 +858,7 @@ async function enrichMetadata(parsed: ParsedQuickRecordIntent, settings: Desktop
       };
     }
 
-    const merged: DesktopQuickRecordMetadata = {
+    const merged: QuickRecordMetadata = {
       ...providerMetadata,
       title: providerMetadata?.title || aiMetadata?.title,
       originalTitle: providerMetadata?.originalTitle || aiMetadata?.originalTitle,
@@ -901,11 +901,11 @@ function resolveCompletedProgress(progress: number, status: AnimeStatus | Parsed
 
 async function processCreateQuickRecord(
   parsedInput: ParsedQuickRecordIntent,
-  options: { rewatchTag?: string; rawText?: string; aiSettings: DesktopAiProviderSettings; trace?: DesktopQuickRecordTraceReporter },
-): Promise<DesktopQuickRecordResult> {
+  options: { rewatchTag?: string; rawText?: string; aiSettings: AiProviderSettings; trace?: QuickRecordTraceReporter },
+): Promise<QuickRecordResult> {
   const parsed = { ...parsedInput, animeTitle: parsedInput.animeTitle.trim() };
   const shouldApplyProgress = hasExplicitProgress(parsed) || parsed.status === "completed";
-  emitDesktopQuickRecordTrace(options.trace, {
+  emitQuickRecordTrace(options.trace, {
     stage: "metadata",
     status: "running",
     title: "正在补齐元数据",
@@ -915,7 +915,7 @@ async function processCreateQuickRecord(
 
   const metadataResult = await enrichMetadata(parsed, options.aiSettings);
   const metadata = metadataResult.metadata;
-  emitDesktopQuickRecordTrace(options.trace, {
+  emitQuickRecordTrace(options.trace, {
     stage: "metadata",
     status: metadata ? "success" : "warning",
     title: metadata ? "元数据补齐完成" : "未补到更多元数据",
@@ -928,7 +928,7 @@ async function processCreateQuickRecord(
     candidates: metadataResult.candidates,
   });
 
-  emitDesktopQuickRecordTrace(options.trace, {
+  emitQuickRecordTrace(options.trace, {
     stage: "write",
     status: "running",
     title: "正在写入数据库",
@@ -937,7 +937,7 @@ async function processCreateQuickRecord(
     created: true,
   });
 
-  const created = upsertDesktopAnimeItem(null, {
+  const created = upsertAnimeItem(null, {
     title: resolveCreateTitle(parsed, metadata?.title),
     originalTitle: parsed.originalTitle || metadata?.originalTitle,
     progress: 0,
@@ -952,7 +952,7 @@ async function processCreateQuickRecord(
     isFinished: parsed.isFinished ?? metadata?.isFinished ?? false,
   });
 
-  let entry = loadDesktopAnimeDetailItem(created.entry.id);
+  let entry = loadAnimeDetailItem(created.entry.id);
   if (!entry) {
     throw new Error("AI 录入后未能读取新建条目");
   }
@@ -966,7 +966,7 @@ async function processCreateQuickRecord(
   };
 
   if (hasPatchChanges(createPatch)) {
-    entry = updateDesktopAnimeDetailItem(entry.id, createPatch).entry;
+    entry = updateAnimeDetailItem(entry.id, createPatch).entry;
   }
 
   const recordedDateString = resolveRecordedDateString(parsed);
@@ -984,7 +984,7 @@ async function processCreateQuickRecord(
     && resolvedStatus !== "plan_to_watch";
 
   if (shouldApplyProgress && (targetProgress > 0 || resolvedStatus === "completed")) {
-    recordDesktopAnimeProgress({
+    recordAnimeProgress({
       id: entry.id,
       requestedProgress: targetProgress,
       totalEpisodes: entry.totalEpisodes,
@@ -992,15 +992,15 @@ async function processCreateQuickRecord(
       note: QUICK_RECORD_HISTORY_NOTE,
       forceHistory: shouldWriteHistory,
     });
-    entry = loadDesktopAnimeDetailItem(entry.id) || entry;
+    entry = loadAnimeDetailItem(entry.id) || entry;
   }
 
   if (resolvedStatus !== entry.status) {
-    entry = updateDesktopAnimeDetailItem(entry.id, { status: resolvedStatus }).entry;
+    entry = updateAnimeDetailItem(entry.id, { status: resolvedStatus }).entry;
   }
 
   const metadataEnriched = buildMetadataEnrichedFlag(parsed, entry);
-  emitDesktopQuickRecordTrace(options.trace, {
+  emitQuickRecordTrace(options.trace, {
     stage: "write",
     status: "success",
     title: "写入完成",
@@ -1023,17 +1023,17 @@ async function processCreateQuickRecord(
 async function processUpdateQuickRecord(
   parsedInput: ParsedQuickRecordIntent,
   current: AnimeListItem,
-  aiSettings: DesktopAiProviderSettings,
-  trace?: DesktopQuickRecordTraceReporter,
-): Promise<DesktopQuickRecordResult> {
+  aiSettings: AiProviderSettings,
+  trace?: QuickRecordTraceReporter,
+): Promise<QuickRecordResult> {
   const parsed = { ...parsedInput, animeTitle: parsedInput.animeTitle.trim() };
   const shouldApplyProgress = hasExplicitProgress(parsed) || parsed.status === "completed";
-  let detail = loadDesktopAnimeDetailItem(current.id);
+  let detail = loadAnimeDetailItem(current.id);
   if (!detail) {
     throw new Error("未找到对应番剧");
   }
 
-  emitDesktopQuickRecordTrace(trace, {
+  emitQuickRecordTrace(trace, {
     stage: "metadata",
     status: "running",
     title: "正在补齐元数据",
@@ -1043,7 +1043,7 @@ async function processUpdateQuickRecord(
 
   const metadataResult = await enrichMetadata(parsed, aiSettings);
   const metadata = metadataResult.metadata;
-  emitDesktopQuickRecordTrace(trace, {
+  emitQuickRecordTrace(trace, {
     stage: "metadata",
     status: metadata ? "success" : "warning",
     title: metadata ? "元数据补齐完成" : "未补到更多元数据",
@@ -1056,7 +1056,7 @@ async function processUpdateQuickRecord(
     candidates: metadataResult.candidates,
   });
 
-  emitDesktopQuickRecordTrace(trace, {
+  emitQuickRecordTrace(trace, {
     stage: "write",
     status: "running",
     title: "正在写入数据库",
@@ -1090,7 +1090,7 @@ async function processUpdateQuickRecord(
   };
 
   if (hasPatchChanges(patch)) {
-    detail = updateDesktopAnimeDetailItem(detail.id, patch).entry;
+    detail = updateAnimeDetailItem(detail.id, patch).entry;
   }
 
   const recordedDateString = resolveRecordedDateString(parsed);
@@ -1099,7 +1099,7 @@ async function processUpdateQuickRecord(
   const shouldRecordProgress = targetProgress > detail.progress || forceHistory;
 
   if (shouldRecordProgress) {
-    recordDesktopAnimeProgress({
+    recordAnimeProgress({
       id: detail.id,
       requestedProgress: targetProgress,
       totalEpisodes: detail.totalEpisodes,
@@ -1107,18 +1107,18 @@ async function processUpdateQuickRecord(
       note: QUICK_RECORD_HISTORY_NOTE,
       forceHistory,
     });
-    detail = loadDesktopAnimeDetailItem(detail.id) || detail;
+    detail = loadAnimeDetailItem(detail.id) || detail;
   }
 
   const resolvedStatus = shouldApplyProgress
     ? (parsed.status || ((detail.totalEpisodes && targetProgress >= detail.totalEpisodes) ? "completed" : undefined))
     : undefined;
   if (resolvedStatus && resolvedStatus !== detail.status) {
-    detail = updateDesktopAnimeDetailItem(detail.id, { status: resolvedStatus }).entry;
+    detail = updateAnimeDetailItem(detail.id, { status: resolvedStatus }).entry;
   }
 
   const metadataEnriched = buildMetadataEnrichedFlag(parsed, detail);
-  emitDesktopQuickRecordTrace(trace, {
+  emitQuickRecordTrace(trace, {
     stage: "write",
     status: "success",
     title: shouldWriteHistory && targetProgress <= current.progress ? "补记完成" : "更新完成",
@@ -1139,17 +1139,17 @@ async function processUpdateQuickRecord(
   };
 }
 
-async function processDesktopQuickRecordIntent(
+async function processQuickRecordIntent(
   parsed: ParsedQuickRecordIntent,
   rawText: string,
-  aiSettings: DesktopAiProviderSettings,
-  trace?: DesktopQuickRecordTraceReporter,
-): Promise<DesktopQuickRecordResult> {
-  const items = loadDesktopAnimeListItems();
+  aiSettings: AiProviderSettings,
+  trace?: QuickRecordTraceReporter,
+): Promise<QuickRecordResult> {
+  const items = loadAnimeListItems();
   const existing = findMatchingAnime(items, parsed);
   let rewatchTag = parsed.rewatchTag || detectRewatchTag(rawText);
 
-  emitDesktopQuickRecordTrace(trace, {
+  emitQuickRecordTrace(trace, {
     stage: "match",
     status: "success",
     title: existing ? "已命中本地条目" : "本地未命中条目",
@@ -1162,7 +1162,7 @@ async function processDesktopQuickRecordIntent(
 
   if (existing && !rewatchTag && shouldAutoResolveRewatch(parsed, existing)) {
     rewatchTag = resolveNextRewatchTag(findRelatedRecords(items, existing));
-    emitDesktopQuickRecordTrace(trace, {
+    emitQuickRecordTrace(trace, {
       stage: "match",
       status: "warning",
       title: "检测到重刷语义",
@@ -1179,25 +1179,25 @@ async function processDesktopQuickRecordIntent(
   return processUpdateQuickRecord(parsed, existing, aiSettings, trace);
 }
 
-export async function quickRecordDesktopAnimeFromText(rawText: string, options: DesktopQuickRecordOptions = {}): Promise<QuickRecordResponse> {
+export async function quickRecordAnimeFromText(rawText: string, options: QuickRecordOptions = {}): Promise<QuickRecordResponse> {
   const text = rawText.trim();
   if (!text) {
     throw new Error("请输入一句话记录");
   }
 
-  emitDesktopQuickRecordTrace(options.onTrace, {
+  emitQuickRecordTrace(options.onTrace, {
     stage: "parse",
     status: "running",
     title: "正在解析输入",
     detail: text,
   });
 
-  const settings = await loadDesktopSettings();
-  ensureDesktopQuickRecordAiSettings(settings.ai);
+  const settings = await loadSettings();
+  ensureQuickRecordAiSettings(settings.ai);
 
-  const parsedBatch = await parseDesktopQuickRecordBatch(text, settings.ai);
+  const parsedBatch = await parseQuickRecordBatch(text, settings.ai);
   if (!Array.isArray(parsedBatch.records) || parsedBatch.records.length === 0) {
-    emitDesktopQuickRecordTrace(options.onTrace, {
+    emitQuickRecordTrace(options.onTrace, {
       stage: "error",
       status: "error",
       title: "未识别到可处理的番剧",
@@ -1206,21 +1206,21 @@ export async function quickRecordDesktopAnimeFromText(rawText: string, options: 
     throw new Error("未能识别番剧名称，请换一种说法");
   }
 
-  emitDesktopQuickRecordTrace(options.onTrace, {
+  emitQuickRecordTrace(options.onTrace, {
     stage: "parse",
     status: "success",
     title: "输入解析完成",
     detail: `识别到 ${parsedBatch.records.length} 条记录：${parsedBatch.records.map((item) => item.animeTitle).join("、")}`,
   });
 
-  const results: DesktopQuickRecordResult[] = [];
+  const results: QuickRecordResult[] = [];
   const errors: Array<{ title: string; error: string }> = [];
 
   for (const parsed of parsedBatch.records) {
     try {
-      results.push(await processDesktopQuickRecordIntent(parsed, text, settings.ai, options.onTrace));
+      results.push(await processQuickRecordIntent(parsed, text, settings.ai, options.onTrace));
     } catch (error) {
-      emitDesktopQuickRecordTrace(options.onTrace, {
+      emitQuickRecordTrace(options.onTrace, {
         stage: "error",
         status: "error",
         title: "单条记录处理失败",
@@ -1238,7 +1238,7 @@ export async function quickRecordDesktopAnimeFromText(rawText: string, options: 
     throw new Error(errors[0]?.error || "AI 录入失败");
   }
 
-  emitDesktopQuickRecordTrace(options.onTrace, {
+  emitQuickRecordTrace(options.onTrace, {
     stage: "complete",
     status: errors.length > 0 ? "warning" : "success",
     title: errors.length > 0 ? "录入完成，但有部分失败" : "录入完成",

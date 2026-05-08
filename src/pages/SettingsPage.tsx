@@ -1,18 +1,18 @@
 import { useTheme } from "@/components/theme/ThemeProvider";
-import { formatLocalDateTimeString } from "@/src/lib/local-date-time";
+import { formatLocalDateTimeString } from "@/lib/local-date-time";
 import type { AppTheme } from "@/lib/theme";
-import { readDesktopRuntimeInfo, type DesktopRuntimeInfo } from "@/src/lib/desktop";
+import { readRuntimeInfo, type RuntimeInfo } from "@/src/lib/runtime";
 import {
-  getCachedDesktopSettings,
-  getDefaultDesktopSettings,
-  loadDesktopSettings,
-  saveDesktopSettings,
-  testDesktopAiConnection,
-  validateDesktopAiSettings,
-  type DesktopAiConnectionTestResult,
-  type DesktopAiProviderSettings,
-  type DesktopAppSettings,
-} from "@/src/lib/desktop-settings-store";
+  getCachedSettings,
+  getDefaultSettings,
+  loadSettings,
+  saveSettings,
+  testAiConnection,
+  validateAiSettings,
+  type AiConnectionTestResult,
+  type AiProviderSettings,
+  type AppSettings,
+} from "@/src/lib/settings-store";
 import { BoltIcon, CheckCircleIcon, CircleStackIcon, PencilSquareIcon, XCircleIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -27,7 +27,7 @@ type AiProviderPreset = {
 type AiConnectionState = {
   status: "idle" | "testing" | "connected" | "failed";
   message: string;
-  result: DesktopAiConnectionTestResult | null;
+  result: AiConnectionTestResult | null;
 };
 
 type ThemeOption = {
@@ -74,7 +74,7 @@ function formatDateTime(value: string | null) {
   return formatLocalDateTimeString(value, "尚未保存");
 }
 
-function describeStorageMode(runtimeInfo: DesktopRuntimeInfo | null) {
+function describeStorageMode(runtimeInfo: RuntimeInfo | null) {
   if (!runtimeInfo) {
     return "浏览器预览 / 本地缓存";
   }
@@ -86,7 +86,7 @@ function describeStorageMode(runtimeInfo: DesktopRuntimeInfo | null) {
   return runtimeInfo.storageMode;
 }
 
-function describeStorageLocation(runtimeInfo: DesktopRuntimeInfo | null) {
+function describeStorageLocation(runtimeInfo: RuntimeInfo | null) {
   if (!runtimeInfo?.databasePath) {
     return "桌面端会统一使用系统应用数据目录。";
   }
@@ -100,7 +100,7 @@ function getThemeLabel(themes: readonly ThemeOption[], value: AppTheme) {
   return themes.find((option) => option.value === value)?.label ?? "当前主题";
 }
 
-function areAiSettingsEqual(left: DesktopAiProviderSettings, right: DesktopAiProviderSettings) {
+function areAiSettingsEqual(left: AiProviderSettings, right: AiProviderSettings) {
   return left.enabled === right.enabled
     && left.provider === right.provider
     && left.baseUrl === right.baseUrl
@@ -108,7 +108,7 @@ function areAiSettingsEqual(left: DesktopAiProviderSettings, right: DesktopAiPro
     && left.apiKey === right.apiKey;
 }
 
-function getInitialAiConnectionState(ai: DesktopAiProviderSettings): AiConnectionState {
+function getInitialAiConnectionState(ai: AiProviderSettings): AiConnectionState {
   if (!ai.enabled) {
     return {
       status: "idle",
@@ -124,7 +124,7 @@ function getInitialAiConnectionState(ai: DesktopAiProviderSettings): AiConnectio
   };
 }
 
-function getAiStatusLabel(ai: DesktopAiProviderSettings, connectionState: AiConnectionState) {
+function getAiStatusLabel(ai: AiProviderSettings, connectionState: AiConnectionState) {
   if (connectionState.status === "testing") {
     return "测试中";
   }
@@ -144,18 +144,18 @@ function getAiStatusLabel(ai: DesktopAiProviderSettings, connectionState: AiConn
   return "待测试";
 }
 
-function buildInitialSettings(theme: AppTheme): DesktopAppSettings {
-  return getCachedDesktopSettings({
-    ...getDefaultDesktopSettings(),
+function buildInitialSettings(theme: AppTheme): AppSettings {
+  return getCachedSettings({
+    ...getDefaultSettings(),
     theme,
   });
 }
 
-export default function DesktopSettingsPage() {
+export default function SettingsPage() {
   const { theme, setTheme, themes } = useTheme();
-  const [settings, setSettings] = useState<DesktopAppSettings>(() => buildInitialSettings(theme));
-  const [aiDraft, setAiDraft] = useState<DesktopAiProviderSettings>(() => buildInitialSettings(theme).ai);
-  const [runtimeInfo, setRuntimeInfo] = useState<DesktopRuntimeInfo | null>(null);
+  const [settings, setSettings] = useState<AppSettings>(() => buildInitialSettings(theme));
+  const [aiDraft, setAiDraft] = useState<AiProviderSettings>(() => buildInitialSettings(theme).ai);
+  const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);
   const [loadingRuntime, setLoadingRuntime] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTestingAi, setIsTestingAi] = useState(false);
@@ -166,7 +166,7 @@ export default function DesktopSettingsPage() {
   useEffect(() => {
     let mounted = true;
 
-    void readDesktopRuntimeInfo()
+    void readRuntimeInfo()
       .then((value) => {
         if (mounted) {
           setRuntimeInfo(value);
@@ -192,7 +192,7 @@ export default function DesktopSettingsPage() {
     let mounted = true;
     const fallbackSettings = buildInitialSettings(theme);
 
-    void loadDesktopSettings(fallbackSettings).then((value) => {
+    void loadSettings(fallbackSettings).then((value) => {
       if (!mounted) {
         return;
       }
@@ -223,11 +223,11 @@ export default function DesktopSettingsPage() {
     });
   }, [theme]);
 
-  const saveSettings = useCallback(async (nextValue: DesktopAppSettings, successMessage: string) => {
+  const persistSettings = useCallback(async (nextValue: AppSettings, successMessage: string) => {
     setIsSaving(true);
 
     try {
-      const nextSettings = await saveDesktopSettings(nextValue);
+      const nextSettings = await saveSettings(nextValue);
       setSettings(nextSettings);
       setAiDraft(nextSettings.ai);
       if (nextSettings.theme !== theme) {
@@ -252,7 +252,7 @@ export default function DesktopSettingsPage() {
       return;
     }
 
-    const validationResult = validateDesktopAiSettings(aiDraft);
+    const validationResult = validateAiSettings(aiDraft);
     setAiConnectionState({ status: validationResult.ok ? "idle" : "failed", message: validationResult.message, result: null });
 
     if (!validationResult.ok) {
@@ -264,10 +264,10 @@ export default function DesktopSettingsPage() {
     setAiConnectionState({ status: "testing", message: "正在发起最小联网请求...", result: null });
 
     try {
-      const result: DesktopAiConnectionTestResult = await testDesktopAiConnection(aiDraft);
+      const result: AiConnectionTestResult = await testAiConnection(aiDraft);
 
       if (result.ok) {
-        const persistedSettings = await saveSettings({
+        const persistedSettings = await persistSettings({
           ...settings,
           ai: aiDraft,
         }, "AI 配置已测试通过并保存");
@@ -293,14 +293,14 @@ export default function DesktopSettingsPage() {
   }, [aiDraft, saveSettings, settings]);
 
   const handleSaveAiDraft = useCallback(async () => {
-    const validationResult = validateDesktopAiSettings(aiDraft, { allowDisabled: true });
+    const validationResult = validateAiSettings(aiDraft, { allowDisabled: true });
     if (!validationResult.ok) {
       setAiConnectionState({ status: "failed", message: validationResult.message, result: null });
       toast.error(validationResult.message);
       return;
     }
 
-    const persistedSettings = await saveSettings({
+    const persistedSettings = await persistSettings({
       ...settings,
       ai: aiDraft,
     }, aiDraft.enabled ? "AI 配置已保存" : "AI 已关闭");
@@ -319,8 +319,8 @@ export default function DesktopSettingsPage() {
       theme: nextTheme,
     };
     setSettings(nextSettings);
-    void saveSettings(nextSettings, "主题已保存");
-  }, [saveSettings, setTheme, settings]);
+    void persistSettings(nextSettings, "主题已保存");
+  }, [persistSettings, setTheme, settings]);
 
   const handleOpenAiEditor = useCallback(() => {
     setAiDraft(settings.ai);
@@ -332,7 +332,7 @@ export default function DesktopSettingsPage() {
     setIsAiEditorOpen(false);
   }, [settings.ai]);
 
-  const updateAiDraft = useCallback((updater: (current: DesktopAiProviderSettings) => DesktopAiProviderSettings) => {
+  const updateAiDraft = useCallback((updater: (current: AiProviderSettings) => AiProviderSettings) => {
     setAiDraft((current) => updater(current));
   }, []);
 

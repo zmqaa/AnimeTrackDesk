@@ -7,10 +7,10 @@ import {
   toOptionalString,
   toStringArray,
 } from "@/lib/ai-validation";
-import type { DesktopAnimeDetailPatchInput } from "@/src/lib/desktop-anime-store";
-import { loadDesktopSettings, type DesktopAiProviderSettings } from "@/src/lib/desktop-settings-store";
+import type { AnimeDetailPatchInput } from "@/src/lib/anime-store";
+import { loadSettings, type AiProviderSettings } from "@/src/lib/settings-store";
 
-type DesktopAiAnimeMetadata = {
+type AiAnimeMetadata = {
   title?: string;
   originalTitle?: string;
   totalEpisodes?: number;
@@ -22,11 +22,11 @@ type DesktopAiAnimeMetadata = {
   coverUrl?: string;
 };
 
-type DesktopAnimeMetadataPatch = Partial<DesktopAnimeDetailPatchInput> & {
+type AnimeMetadataPatch = Partial<AnimeDetailPatchInput> & {
   score?: number;
 };
 
-type DesktopAnimeEnrichmentCommand = "enrich_desktop_anime_metadata";
+type AnimeEnrichmentCommand = "enrich_anime_metadata";
 
 const MAX_METADATA_CAST_MEMBERS = 10;
 const DEFAULT_METADATA_FIELDS = [
@@ -64,8 +64,8 @@ const FIELD_SOURCE_PRIORITY: Record<MetadataField, MetadataSource[]> = {
   isFinished: ["provider", "ai"],
 };
 
-export type DesktopAnimeEnrichmentResult = {
-  patch: DesktopAnimeDetailPatchInput;
+export type AnimeEnrichmentResult = {
+  patch: AnimeDetailPatchInput;
   appliedFields: string[];
   usedAi: boolean;
   usedProvider: boolean;
@@ -318,7 +318,7 @@ function hasMissingMetadataField(current: AnimeDetailItem, field: MetadataField)
 }
 
 function buildMetadataPatch(current: AnimeDetailItem, candidate: Partial<Record<MetadataField, unknown>>) {
-  const patch: DesktopAnimeMetadataPatch = {};
+  const patch: AnimeMetadataPatch = {};
 
   for (const field of DEFAULT_METADATA_FIELDS) {
     const normalizedNext = normalizeMetadataFieldValue(field, candidate[field]);
@@ -334,8 +334,8 @@ function buildMetadataPatch(current: AnimeDetailItem, candidate: Partial<Record<
   return patch;
 }
 
-async function invokeDesktopAnimeEnrichmentCommand<T>(
-  command: DesktopAnimeEnrichmentCommand,
+async function invokeAnimeEnrichmentCommand<T>(
+  command: AnimeEnrichmentCommand,
   args?: Record<string, unknown>,
 ) {
   try {
@@ -346,7 +346,7 @@ async function invokeDesktopAnimeEnrichmentCommand<T>(
   }
 }
 
-function hasReadyAiSettings(settings: DesktopAiProviderSettings) {
+function hasReadyAiSettings(settings: AiProviderSettings) {
   return settings.enabled
     && Boolean(settings.provider.trim())
     && Boolean(settings.baseUrl.trim())
@@ -354,7 +354,7 @@ function hasReadyAiSettings(settings: DesktopAiProviderSettings) {
     && Boolean(settings.apiKey.trim());
 }
 
-function normalizeAiMetadataPayload(value: unknown): DesktopAiAnimeMetadata | null {
+function normalizeAiMetadataPayload(value: unknown): AiAnimeMetadata | null {
   if (!value || typeof value !== "object") {
     return null;
   }
@@ -373,12 +373,12 @@ function normalizeAiMetadataPayload(value: unknown): DesktopAiAnimeMetadata | nu
   };
 }
 
-async function fetchDesktopAiMetadata(queryName: string, settings: DesktopAiProviderSettings) {
+async function fetchAiMetadata(queryName: string, settings: AiProviderSettings) {
   if (!hasReadyAiSettings(settings)) {
     return null;
   }
 
-  const response = await invokeDesktopAnimeEnrichmentCommand<Record<string, unknown>>("enrich_desktop_anime_metadata", {
+  const response = await invokeAnimeEnrichmentCommand<Record<string, unknown>>("enrich_anime_metadata", {
     queryName,
     settings,
   });
@@ -386,7 +386,7 @@ async function fetchDesktopAiMetadata(queryName: string, settings: DesktopAiProv
   return normalizeAiMetadataPayload(response);
 }
 
-function buildProviderQueries(item: AnimeDetailItem, aiMetadata: DesktopAiAnimeMetadata | null) {
+function buildProviderQueries(item: AnimeDetailItem, aiMetadata: AiAnimeMetadata | null) {
   return Array.from(
     new Set(
       [
@@ -401,8 +401,8 @@ function buildProviderQueries(item: AnimeDetailItem, aiMetadata: DesktopAiAnimeM
   );
 }
 
-function toDesktopDetailPatch(patch: DesktopAnimeMetadataPatch): DesktopAnimeDetailPatchInput {
-  const nextPatch: DesktopAnimeDetailPatchInput = {};
+function toAnimeDetailPatch(patch: AnimeMetadataPatch): AnimeDetailPatchInput {
+  const nextPatch: AnimeDetailPatchInput = {};
 
   if (patch.title !== undefined) {
     nextPatch.title = patch.title;
@@ -441,16 +441,16 @@ function toDesktopDetailPatch(patch: DesktopAnimeMetadataPatch): DesktopAnimeDet
   return nextPatch;
 }
 
-export async function enrichDesktopAnimeEntryMetadata(item: AnimeDetailItem): Promise<DesktopAnimeEnrichmentResult> {
-  const settings = await loadDesktopSettings();
+export async function enrichAnimeEntryMetadata(item: AnimeDetailItem): Promise<AnimeEnrichmentResult> {
+  const settings = await loadSettings();
   const queryName = item.originalTitle?.trim() || item.title.trim();
-  const aiMetadata = await fetchDesktopAiMetadata(queryName, settings.ai);
+  const aiMetadata = await fetchAiMetadata(queryName, settings.ai);
   const providerMetadata = await fetchAnimeMetadataByQueries(...buildProviderQueries(item, aiMetadata));
 
   const mergedCandidate = buildMetadataCandidate(providerMetadata, aiMetadata);
   const metadataPatch = buildMetadataPatch(item, mergedCandidate);
 
-  const nextPatch: DesktopAnimeMetadataPatch = {
+  const nextPatch: AnimeMetadataPatch = {
     ...metadataPatch,
   };
 
@@ -458,7 +458,7 @@ export async function enrichDesktopAnimeEntryMetadata(item: AnimeDetailItem): Pr
     delete nextPatch.score;
   }
 
-  const patch = toDesktopDetailPatch(nextPatch);
+  const patch = toAnimeDetailPatch(nextPatch);
   const appliedFields = Object.entries(patch)
     .filter(([, value]) => value !== undefined)
     .map(([field]) => field);

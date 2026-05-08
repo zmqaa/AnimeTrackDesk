@@ -1,3 +1,5 @@
+import { normalizeDateString } from '../date-utils';
+
 const MAX_METADATA_CAST_MEMBERS = 10;
 
 const DEFAULT_METADATA_FIELDS = [
@@ -25,7 +27,7 @@ const AI_CAPABLE_METADATA_FIELDS = new Set([
   'isFinished',
 ]);
 
-const FIELD_SOURCE_PRIORITY = {
+const FIELD_SOURCE_PRIORITY: Record<string, string[]> = {
   originalTitle: ['provider', 'ai'],
   coverUrl: ['provider', 'ai'],
   score: ['provider'],
@@ -41,9 +43,9 @@ const FIELD_SOURCE_PRIORITY = {
 
 const ALL_METADATA_FIELDS = Object.keys(FIELD_SOURCE_PRIORITY);
 
-function uniqueStrings(values) {
-  const seen = new Set();
-  const result = [];
+function uniqueStrings(values: unknown[]) {
+  const seen = new Set<string>();
+  const result: string[] = [];
 
   for (const value of values) {
     const normalized = typeof value === 'string' ? value.trim() : '';
@@ -58,22 +60,19 @@ function uniqueStrings(values) {
   return result;
 }
 
-function containsCjkText(value) {
+function containsCjkText(value: unknown) {
   return /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(String(value || ''));
 }
 
-function isBlank(value) {
+function isBlank(value: unknown) {
   return typeof value !== 'string' || !value.trim();
 }
 
-function hasPlaceholderCover(value) {
+function hasPlaceholderCover(value: unknown) {
   return typeof value === 'string' && /placeholder/i.test(value);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { normalizeDateString } = require('../date-utils.js');
-
-function parseStringArray(value) {
+function parseStringArray(value: unknown) {
   if (Array.isArray(value)) {
     return uniqueStrings(value.map((item) => (typeof item === 'string' ? item : String(item ?? ''))));
   }
@@ -96,7 +95,7 @@ function parseStringArray(value) {
 
 const normalizeMetadataDate = normalizeDateString;
 
-function normalizeMetadataFieldValue(field, value) {
+function normalizeMetadataFieldValue(field: string, value: unknown) {
   if (value === undefined || value === null) {
     return undefined;
   }
@@ -148,7 +147,7 @@ function normalizeMetadataFieldValue(field, value) {
       return Math.round(numeric);
     }
     case 'premiereDate':
-      return normalizeMetadataDate(value);
+      return normalizeMetadataDate(value as Date | string | number | null | undefined);
     case 'tags': {
       const values = parseStringArray(value);
       return values.length > 0 ? values.slice(0, 20) : undefined;
@@ -168,7 +167,7 @@ function normalizeMetadataFieldValue(field, value) {
   }
 }
 
-function isMetadataFieldMissing(field, value) {
+function isMetadataFieldMissing(field: string, value: unknown) {
   if (field === 'summary') {
     return normalizeMetadataFieldValue(field, value) === undefined;
   }
@@ -185,7 +184,7 @@ function isMetadataFieldMissing(field, value) {
       return !Number.isFinite(numeric) || numeric <= 0;
     }
     case 'premiereDate':
-      return !normalizeMetadataDate(value);
+      return !normalizeMetadataDate(value as Date | string | number | null | undefined);
     case 'tags':
     case 'cast':
     case 'castAliases':
@@ -197,11 +196,11 @@ function isMetadataFieldMissing(field, value) {
   }
 }
 
-function sameString(left, right) {
+function sameString(left: unknown, right: unknown) {
   return String(left || '').trim() === String(right || '').trim();
 }
 
-function sameNumber(left, right) {
+function sameNumber(left: unknown, right: unknown) {
   if (left === undefined && right === undefined) {
     return true;
   }
@@ -215,7 +214,7 @@ function sameNumber(left, right) {
   return Math.abs(a - b) < 0.0001;
 }
 
-function sameArray(left, right) {
+function sameArray(left: unknown, right: unknown) {
   const a = uniqueStrings(Array.isArray(left) ? left : []).sort();
   const b = uniqueStrings(Array.isArray(right) ? right : []).sort();
 
@@ -232,7 +231,7 @@ function sameArray(left, right) {
   return true;
 }
 
-function sameBoolean(left, right) {
+function sameBoolean(left: unknown, right: unknown) {
   if (left === undefined && right === undefined) {
     return true;
   }
@@ -244,7 +243,7 @@ function sameBoolean(left, right) {
   return Boolean(left) === Boolean(right);
 }
 
-function sameMetadataFieldValue(field, left, right) {
+function sameMetadataFieldValue(field: string, left: unknown, right: unknown) {
   switch (field) {
     case 'originalTitle':
     case 'coverUrl':
@@ -255,7 +254,10 @@ function sameMetadataFieldValue(field, left, right) {
     case 'durationMinutes':
       return sameNumber(left, right);
     case 'premiereDate':
-      return sameString(normalizeMetadataDate(left), normalizeMetadataDate(right));
+      return sameString(
+        normalizeMetadataDate(left as Date | string | number | null | undefined),
+        normalizeMetadataDate(right as Date | string | number | null | undefined),
+      );
     case 'tags':
     case 'cast':
     case 'castAliases':
@@ -267,7 +269,7 @@ function sameMetadataFieldValue(field, left, right) {
   }
 }
 
-function isStrictStringArraySuperset(nextValue, currentValue) {
+function isStrictStringArraySuperset(nextValue: unknown, currentValue: unknown) {
   const next = uniqueStrings(Array.isArray(nextValue) ? nextValue : []);
   const current = uniqueStrings(Array.isArray(currentValue) ? currentValue : []);
 
@@ -278,7 +280,7 @@ function isStrictStringArraySuperset(nextValue, currentValue) {
   return current.every((item) => next.includes(item));
 }
 
-function normalizeSourceMetadata(source) {
+function normalizeSourceMetadata(source?: Record<string, unknown> | null) {
   const value = source || {};
 
   return {
@@ -293,14 +295,14 @@ function normalizeSourceMetadata(source) {
     cast: normalizeMetadataFieldValue('cast', value.cast),
     castAliases: normalizeMetadataFieldValue('castAliases', value.castAliases),
     isFinished: normalizeMetadataFieldValue('isFinished', value.isFinished),
-  };
+  } as Record<string, unknown>;
 }
 
-function pickPreferredValue(field, normalizedSources) {
+function pickPreferredValue(field: string, normalizedSources: Record<string, Record<string, unknown>>) {
   if (field === 'castAliases') {
     const providerAliases = Array.isArray(normalizedSources.provider.castAliases) ? normalizedSources.provider.castAliases : [];
     const aiAliases = Array.isArray(normalizedSources.ai.castAliases) ? normalizedSources.ai.castAliases : [];
-    const mergedAliases = uniqueStrings([...providerAliases, ...aiAliases]);
+    const mergedAliases = uniqueStrings([...(providerAliases as unknown[]), ...(aiAliases as unknown[])]);
     if (mergedAliases.length > 0) {
       return mergedAliases;
     }
@@ -316,7 +318,7 @@ function pickPreferredValue(field, normalizedSources) {
   return undefined;
 }
 
-function resolveSourceLabel(field, normalizedSources, candidateValue) {
+function resolveSourceLabel(field: string, normalizedSources: Record<string, Record<string, unknown>>, candidateValue: unknown) {
   if (field === 'castAliases') {
     const providerAliases = Array.isArray(normalizedSources.provider.castAliases) ? normalizedSources.provider.castAliases : [];
     const aiAliases = Array.isArray(normalizedSources.ai.castAliases) ? normalizedSources.ai.castAliases : [];
@@ -335,14 +337,14 @@ function resolveSourceLabel(field, normalizedSources, candidateValue) {
   return undefined;
 }
 
-function buildMetadataCandidate(provider, ai) {
+function buildMetadataCandidate(provider?: Record<string, unknown> | null, ai?: Record<string, unknown> | null) {
   const normalizedSources = {
     provider: normalizeSourceMetadata(provider),
     ai: normalizeSourceMetadata(ai),
   };
 
-  const candidate = {};
-  const source = {};
+  const candidate: Record<string, unknown> = {};
+  const source: Record<string, string> = {};
 
   for (const field of ALL_METADATA_FIELDS) {
     const candidateValue = pickPreferredValue(field, normalizedSources);
@@ -361,15 +363,19 @@ function buildMetadataCandidate(provider, ai) {
   return { candidate, source };
 }
 
-function fieldPrefersAi(field) {
+function fieldPrefersAi(field: string) {
   return FIELD_SOURCE_PRIORITY[field]?.[0] === 'ai';
 }
 
-function fieldSupportsAi(field) {
+function fieldSupportsAi(field: string) {
   return AI_CAPABLE_METADATA_FIELDS.has(field) && FIELD_SOURCE_PRIORITY[field]?.includes('ai');
 }
 
-function shouldUseAiForMetadata(current, providerCandidate, options = {}) {
+function shouldUseAiForMetadata(
+  current?: Record<string, unknown>,
+  providerCandidate?: Record<string, unknown>,
+  options: { fields?: string[]; force?: boolean } = {},
+) {
   const fields = Array.isArray(options.fields) && options.fields.length > 0 ? options.fields : DEFAULT_METADATA_FIELDS;
   const force = Boolean(options.force);
 
@@ -409,7 +415,17 @@ function shouldUseAiForMetadata(current, providerCandidate, options = {}) {
   return false;
 }
 
-function shouldUpdateMetadataField(field, currentValue, nextValue, options = {}) {
+function shouldUpdateMetadataField(
+  field: string,
+  currentValue: unknown,
+  nextValue: unknown,
+  options: {
+    force?: boolean;
+    allowIsFinishedUpgrade?: boolean;
+    allowCastAliasAugment?: boolean;
+    allowReplaceFilledCover?: boolean;
+  } = {},
+) {
   if (nextValue === undefined) {
     return false;
   }
@@ -438,12 +454,22 @@ function shouldUpdateMetadataField(field, currentValue, nextValue, options = {})
   return !sameMetadataFieldValue(field, currentValue, nextValue);
 }
 
-function buildMetadataPatch(current, candidateLike, options = {}) {
+function buildMetadataPatch(
+  current?: Record<string, unknown>,
+  candidateLike?: Record<string, unknown>,
+  options: {
+    fields?: string[];
+    force?: boolean;
+    allowIsFinishedUpgrade?: boolean;
+    allowCastAliasAugment?: boolean;
+    allowReplaceFilledCover?: boolean;
+  } = {},
+) {
   const fields = Array.isArray(options.fields) && options.fields.length > 0 ? options.fields : DEFAULT_METADATA_FIELDS;
-  const candidate = candidateLike?.candidate || candidateLike || {};
-  const source = candidateLike?.source || {};
-  const patch = {};
-  const sources = {};
+  const candidate = (candidateLike?.candidate || candidateLike || {}) as Record<string, unknown>;
+  const source = (candidateLike?.source || {}) as Record<string, string>;
+  const patch: Record<string, unknown> = {};
+  const sources: Record<string, string> = {};
 
   for (const field of fields) {
     const normalizedNext = normalizeMetadataFieldValue(field, candidate[field]);
@@ -462,7 +488,17 @@ function buildMetadataPatch(current, candidateLike, options = {}) {
   return { patch, sources };
 }
 
-function applyMetadataPatch(current, candidateLike, options = {}) {
+function applyMetadataPatch(
+  current?: Record<string, unknown>,
+  candidateLike?: Record<string, unknown>,
+  options?: {
+    fields?: string[];
+    force?: boolean;
+    allowIsFinishedUpgrade?: boolean;
+    allowCastAliasAugment?: boolean;
+    allowReplaceFilledCover?: boolean;
+  },
+) {
   const { patch, sources } = buildMetadataPatch(current, candidateLike, options);
   return {
     data: {
@@ -474,7 +510,7 @@ function applyMetadataPatch(current, candidateLike, options = {}) {
   };
 }
 
-module.exports = {
+const metadataMergePolicy = {
   ALL_METADATA_FIELDS,
   AI_CAPABLE_METADATA_FIELDS,
   DEFAULT_METADATA_FIELDS,
@@ -487,3 +523,19 @@ module.exports = {
   sameMetadataFieldValue,
   shouldUseAiForMetadata,
 };
+
+export {
+  ALL_METADATA_FIELDS,
+  AI_CAPABLE_METADATA_FIELDS,
+  DEFAULT_METADATA_FIELDS,
+  buildMetadataCandidate,
+  buildMetadataPatch,
+  applyMetadataPatch,
+  isMetadataFieldMissing,
+  normalizeMetadataDate,
+  normalizeMetadataFieldValue,
+  sameMetadataFieldValue,
+  shouldUseAiForMetadata,
+};
+
+export default metadataMergePolicy;

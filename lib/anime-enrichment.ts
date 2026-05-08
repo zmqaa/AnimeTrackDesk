@@ -4,7 +4,7 @@ import { enrichAnimeData, buildVoiceActorAliases } from './ai';
 import { fetchAnimeMetadataByQueries } from './anime-provider';
 import { uniqueStrings } from './anime-cast';
 import type { CreateAnimeDTO } from './anime';
-import metadataMergePolicy from './metadata/merge-policy.js';
+import metadataMergePolicy from './metadata/merge-policy';
 import {
   toOptionalString, toOptionalNumber, toOptionalBoolean, toOptionalDateString, toStringArray,
 } from './ai-validation';

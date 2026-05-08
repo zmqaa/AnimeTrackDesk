@@ -5,12 +5,12 @@ import AnimeGrid, { type ViewMode } from "@/components/anime/AnimeGrid";
 import AnimeHeader from "@/components/anime/AnimeHeader";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { ListBulletIcon, MagnifyingGlassIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
-import AnimePagination from "@/app/anime/AnimePagination";
-import AnimeQuickRecordPanel from "@/app/anime/AnimeQuickRecordPanel";
-import AnimeSidebar from "@/app/anime/AnimeSidebar";
-import { buildQuickRecordMessage, buildRecentWatchItems, buildTagPreferences, buildVoiceActorSuggestions, filterAndSortAnimeItems, type QuickRecordResponse } from "@/app/anime/anime-page-helpers";
-import { quickRecordDesktopAnimeFromText, type DesktopQuickRecordTraceEvent } from "@/src/lib/desktop-ai-quick-record";
-import { deleteDesktopAnimeItem, loadDesktopAnimeListItems, type DesktopAnimeUpsertInput, upsertDesktopAnimeItem, updateDesktopAnimeProgress } from "@/src/lib/desktop-anime-store";
+import AnimePagination from "@/src/features/anime/AnimePagination";
+import AnimeQuickRecordPanel from "@/src/features/anime/AnimeQuickRecordPanel";
+import AnimeSidebar from "@/src/features/anime/AnimeSidebar";
+import { buildQuickRecordMessage, buildRecentWatchItems, buildTagPreferences, buildVoiceActorSuggestions, filterAndSortAnimeItems, type QuickRecordResponse } from "@/src/features/anime/anime-page-helpers";
+import { quickRecordAnimeFromText, type QuickRecordTraceEvent } from "@/src/lib/quick-record";
+import { deleteAnimeItem, loadAnimeListItems, type AnimeUpsertInput, upsertAnimeItem, updateAnimeProgress } from "@/src/lib/anime-store";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useLocation, useSearchParams } from "react-router-dom";
@@ -39,15 +39,15 @@ function parseFilterStatus(value: string | null): AnimeStatus | "all" {
   return "all";
 }
 
-export default function DesktopAnimePage() {
-  const [items, setItems] = useState<AnimeListItem[]>(() => loadDesktopAnimeListItems());
+export default function AnimePage() {
+  const [items, setItems] = useState<AnimeListItem[]>(() => loadAnimeListItems());
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState<AnimeFormInitialData>(EMPTY_FORM_DATA);
   const [quickInput, setQuickInput] = useState("");
   const [quickLoading, setQuickLoading] = useState(false);
   const [quickMessage, setQuickMessage] = useState("");
-  const [quickTrace, setQuickTrace] = useState<DesktopQuickRecordTraceEvent[]>([]);
+  const [quickTrace, setQuickTrace] = useState<QuickRecordTraceEvent[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<AnimeSortBy>("lastWatchedAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -192,7 +192,7 @@ export default function DesktopAnimePage() {
   }, []);
 
   const handleSubmit = useCallback(async (payload: AnimeFormSubmitPayload) => {
-    const result = upsertDesktopAnimeItem(editingId, payload as DesktopAnimeUpsertInput);
+    const result = upsertAnimeItem(editingId, payload as AnimeUpsertInput);
     setItems(result.items);
   }, [editingId]);
 
@@ -209,7 +209,7 @@ export default function DesktopAnimePage() {
       return;
     }
 
-    const result = deleteDesktopAnimeItem(deleteConfirm.id);
+    const result = deleteAnimeItem(deleteConfirm.id);
     setItems(result.items);
     setDeleteConfirm(null);
     resetForm();
@@ -229,12 +229,12 @@ export default function DesktopAnimePage() {
     setQuickTrace([]);
 
     try {
-      const data: QuickRecordResponse = await quickRecordDesktopAnimeFromText(text, {
+      const data: QuickRecordResponse = await quickRecordAnimeFromText(text, {
         onTrace: (event) => {
           setQuickTrace((current) => [...current, event]);
         },
       });
-      setItems(loadDesktopAnimeListItems());
+      setItems(loadAnimeListItems());
       setQuickInput("");
       setQuickMessage(buildQuickRecordMessage(data));
       toast.success("AI 录入成功");
@@ -252,7 +252,7 @@ export default function DesktopAnimePage() {
       return;
     }
 
-    const result = updateDesktopAnimeProgress(id, current, total);
+    const result = updateAnimeProgress(id, current, total);
     setItems(result.items);
 
     if (result.completedNow) {

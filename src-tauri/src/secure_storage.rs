@@ -3,40 +3,40 @@ use std::{collections::HashMap, sync::OnceLock};
 use keyring_core::{Entry, Error as KeyringError};
 use serde::Serialize;
 
-const DESKTOP_SECRET_SERVICE: &str = "com.zmqqqa.animetrack.desktop";
-pub const DESKTOP_SECRET_STORAGE_MODE_OS_KEYCHAIN: &str = "os-keychain";
-pub const DESKTOP_SECRET_STORAGE_MODE_ENCRYPTED_SQLITE: &str = "encrypted-sqlite";
+const SECRET_SERVICE: &str = "com.zmqqqa.animetrack.desktop";
+pub const SECRET_STORAGE_MODE_OS_KEYCHAIN: &str = "os-keychain";
+pub const SECRET_STORAGE_MODE_ENCRYPTED_SQLITE: &str = "encrypted-sqlite";
 
 static SECRET_STORE_MODE: OnceLock<Result<&'static str, String>> = OnceLock::new();
 
 #[derive(Debug, Clone, Copy)]
-pub enum DesktopSecretKey {
+pub enum SecretKey {
   AiApiKey,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DesktopSecretValue {
+pub struct SecretValue {
   pub value: Option<String>,
   pub storage_mode: String,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DesktopSecretOperationResult {
+pub struct SecretOperationResult {
   pub storage_mode: String,
 }
 
-impl DesktopSecretKey {
+impl SecretKey {
   fn user(self) -> &'static str {
     match self {
-      DesktopSecretKey::AiApiKey => "ai-provider-api-key",
+      SecretKey::AiApiKey => "ai-provider-api-key",
     }
   }
 
   pub fn parse(value: &str) -> Result<Self, String> {
     match value.trim() {
-      "ai-api-key" => Ok(DesktopSecretKey::AiApiKey),
+      "ai-api-key" => Ok(SecretKey::AiApiKey),
       _ => Err("不支持的安全存储键。".to_string()),
     }
   }
@@ -52,14 +52,14 @@ fn normalize_secret_store_error(error: KeyringError) -> String {
   }
 }
 
-fn ensure_desktop_secret_store() -> Result<&'static str, String> {
+fn ensure_secret_store() -> Result<&'static str, String> {
   let initialization = SECRET_STORE_MODE.get_or_init(|| {
     keyring::use_native_store(true)
-      .map(|_| DESKTOP_SECRET_STORAGE_MODE_OS_KEYCHAIN)
+      .map(|_| SECRET_STORAGE_MODE_OS_KEYCHAIN)
       .or_else(|native_error| {
         let fallback_config = HashMap::new();
         keyring::use_sqlite_store(&fallback_config)
-          .map(|_| DESKTOP_SECRET_STORAGE_MODE_ENCRYPTED_SQLITE)
+          .map(|_| SECRET_STORAGE_MODE_ENCRYPTED_SQLITE)
           .map_err(|sqlite_error| {
             format!(
               "初始化安全存储失败：native={native_error}; sqlite={sqlite_error}"
@@ -74,13 +74,13 @@ fn ensure_desktop_secret_store() -> Result<&'static str, String> {
   }
 }
 
-fn build_secret_entry(key: DesktopSecretKey) -> Result<(Entry, &'static str), String> {
-  let storage_mode = ensure_desktop_secret_store()?;
-  let entry = Entry::new(DESKTOP_SECRET_SERVICE, key.user()).map_err(normalize_secret_store_error)?;
+fn build_secret_entry(key: SecretKey) -> Result<(Entry, &'static str), String> {
+  let storage_mode = ensure_secret_store()?;
+  let entry = Entry::new(SECRET_SERVICE, key.user()).map_err(normalize_secret_store_error)?;
   Ok((entry, storage_mode))
 }
 
-pub fn load_secret_value(key: DesktopSecretKey) -> Result<Option<String>, String> {
+pub fn load_secret_value(key: SecretKey) -> Result<Option<String>, String> {
   let (entry, _storage_mode) = build_secret_entry(key)?;
 
   match entry.get_password() {
@@ -91,34 +91,34 @@ pub fn load_secret_value(key: DesktopSecretKey) -> Result<Option<String>, String
 }
 
 pub fn save_secret_value(
-  key: DesktopSecretKey,
+  key: SecretKey,
   value: &str,
-) -> Result<DesktopSecretOperationResult, String> {
+) -> Result<SecretOperationResult, String> {
   let (entry, storage_mode) = build_secret_entry(key)?;
   entry.set_password(value).map_err(normalize_secret_store_error)?;
 
-  Ok(DesktopSecretOperationResult {
+  Ok(SecretOperationResult {
     storage_mode: storage_mode.to_string(),
   })
 }
 
-pub fn delete_secret_value(key: DesktopSecretKey) -> Result<DesktopSecretOperationResult, String> {
+pub fn delete_secret_value(key: SecretKey) -> Result<SecretOperationResult, String> {
   let (entry, storage_mode) = build_secret_entry(key)?;
 
   match entry.delete_credential() {
-    Ok(()) | Err(KeyringError::NoEntry) => Ok(DesktopSecretOperationResult {
+    Ok(()) | Err(KeyringError::NoEntry) => Ok(SecretOperationResult {
       storage_mode: storage_mode.to_string(),
     }),
     Err(error) => Err(normalize_secret_store_error(error)),
   }
 }
 
-pub fn load_secret_by_name(key: &str) -> Result<DesktopSecretValue, String> {
-  let parsed_key = DesktopSecretKey::parse(key)?;
-  let storage_mode = ensure_desktop_secret_store()?.to_string();
+pub fn load_secret_by_name(key: &str) -> Result<SecretValue, String> {
+  let parsed_key = SecretKey::parse(key)?;
+  let storage_mode = ensure_secret_store()?.to_string();
   let value = load_secret_value(parsed_key)?;
 
-  Ok(DesktopSecretValue {
+  Ok(SecretValue {
     value,
     storage_mode,
   })
@@ -127,12 +127,12 @@ pub fn load_secret_by_name(key: &str) -> Result<DesktopSecretValue, String> {
 pub fn save_secret_by_name(
   key: &str,
   value: &str,
-) -> Result<DesktopSecretOperationResult, String> {
-  let parsed_key = DesktopSecretKey::parse(key)?;
+) -> Result<SecretOperationResult, String> {
+  let parsed_key = SecretKey::parse(key)?;
   save_secret_value(parsed_key, value)
 }
 
-pub fn delete_secret_by_name(key: &str) -> Result<DesktopSecretOperationResult, String> {
-  let parsed_key = DesktopSecretKey::parse(key)?;
+pub fn delete_secret_by_name(key: &str) -> Result<SecretOperationResult, String> {
+  let parsed_key = SecretKey::parse(key)?;
   delete_secret_value(parsed_key)
 }

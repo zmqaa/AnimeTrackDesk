@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "bundle:portable": "powershell -ExecutionPolicy Bypass -File scripts/deploy/package-portable.ps1"
+    "bundle:portable": "powershell -ExecutionPolicy Bypass -File scripts/deploy/package-portable.ps1",
+    "build:portable": "tauri build --no-bundle && npm run bundle:portable"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

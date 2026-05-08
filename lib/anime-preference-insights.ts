@@ -229,7 +229,7 @@ export function analyzeAnimePreferenceInsight(
   return {
     tone: "comfort",
     headline: "整体还算顺口",
-    message: `它至少和你的库存没有明显冲突，虽然不是高度同类，但看起来不会突然越界。`,
+    message: "它至少和你的库存没有明显冲突，虽然不是高度同类，但看起来不会突然越界。",
     profileSummary: buildProfileSummary(profile),
     favoriteTags: profile.favoriteTags,
     matchingTags,

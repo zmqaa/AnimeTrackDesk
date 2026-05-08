@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { FireIcon, SparklesIcon, TagIcon, TvIcon } from '@heroicons/react/24/outline';
 import type { AnimeCardItem, AnimeListItem } from '@/lib/anime-shared';
-import { buildLibraryStats, formatRecentWatchDate } from './anime-page-helpers';
+import { buildLibraryStats, formatRecentWatchDate } from '@/src/features/anime/anime-page-helpers';
 
 type AnimeSidebarProps = {
   items: AnimeListItem[];

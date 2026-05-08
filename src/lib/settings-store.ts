@@ -1,6 +1,6 @@
 import { DEFAULT_THEME, isAppTheme, type AppTheme } from "@/lib/theme";
 
-export interface DesktopAiProviderSettings {
+export interface AiProviderSettings {
   enabled: boolean;
   provider: string;
   baseUrl: string;
@@ -8,32 +8,32 @@ export interface DesktopAiProviderSettings {
   apiKey: string;
 }
 
-export interface DesktopAppSettings {
+export interface AppSettings {
   displayName: string;
   theme: AppTheme;
-  ai: DesktopAiProviderSettings;
+  ai: AiProviderSettings;
   updatedAt: string | null;
 }
 
-export interface DesktopAiValidationResult {
+export interface AiValidationResult {
   ok: boolean;
   message: string;
 }
 
-export interface DesktopAiConnectionTestResult extends DesktopAiValidationResult {
+export interface AiConnectionTestResult extends AiValidationResult {
   provider: string;
   endpoint: string | null;
   statusCode: number | null;
   latencyMs: number | null;
 }
 
-interface DesktopAiValidationOptions {
+interface AiValidationOptions {
   allowDisabled?: boolean;
 }
 
 const SETTINGS_STORAGE_KEY = "animetrack.settings";
 
-const DEFAULT_DESKTOP_SETTINGS: DesktopAppSettings = {
+const DEFAULT_SETTINGS: AppSettings = {
   displayName: "动漫记录",
   theme: DEFAULT_THEME,
   ai: {
@@ -46,7 +46,7 @@ const DEFAULT_DESKTOP_SETTINGS: DesktopAppSettings = {
   updatedAt: null,
 };
 
-type DesktopSettingsCommand = "load_desktop_settings" | "save_desktop_settings" | "test_desktop_ai_connection";
+type SettingsCommand = "load_settings" | "save_settings" | "test_ai_connection";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -73,31 +73,31 @@ function normalizeOptionalNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function normalizeAiSettings(value: unknown): DesktopAiProviderSettings {
+function normalizeAiSettings(value: unknown): AiProviderSettings {
   const record = isRecord(value) ? value : {};
 
   return {
     enabled: Boolean(record.enabled),
-    provider: normalizeText(record.provider, DEFAULT_DESKTOP_SETTINGS.ai.provider),
-    baseUrl: normalizeText(record.baseUrl, DEFAULT_DESKTOP_SETTINGS.ai.baseUrl).replace(/\/+$/, ""),
-    model: normalizeText(record.model, DEFAULT_DESKTOP_SETTINGS.ai.model),
+    provider: normalizeText(record.provider, DEFAULT_SETTINGS.ai.provider),
+    baseUrl: normalizeText(record.baseUrl, DEFAULT_SETTINGS.ai.baseUrl).replace(/\/+$/, ""),
+    model: normalizeText(record.model, DEFAULT_SETTINGS.ai.model),
     apiKey: normalizeOptionalText(record.apiKey),
   };
 }
 
-function normalizeDesktopSettings(value: unknown): DesktopAppSettings {
+function normalizeSettings(value: unknown): AppSettings {
   const record = isRecord(value) ? value : {};
 
   return {
-    displayName: normalizeText(record.displayName, DEFAULT_DESKTOP_SETTINGS.displayName),
-    theme: typeof record.theme === "string" && isAppTheme(record.theme) ? record.theme : DEFAULT_DESKTOP_SETTINGS.theme,
+    displayName: normalizeText(record.displayName, DEFAULT_SETTINGS.displayName),
+    theme: typeof record.theme === "string" && isAppTheme(record.theme) ? record.theme : DEFAULT_SETTINGS.theme,
     ai: normalizeAiSettings(record.ai),
     updatedAt: typeof record.updatedAt === "string" && record.updatedAt.trim() ? record.updatedAt : null,
   };
 }
 
-function stripDesktopSettingsSecrets(value: DesktopAppSettings) {
-  return normalizeDesktopSettings({
+function stripSettingsSecrets(value: AppSettings) {
+  return normalizeSettings({
     ...value,
     ai: {
       ...value.ai,
@@ -106,14 +106,14 @@ function stripDesktopSettingsSecrets(value: DesktopAppSettings) {
   });
 }
 
-function mergeDesktopSettings(base: DesktopAppSettings, override?: Partial<DesktopAppSettings>) {
+function mergeSettings(base: AppSettings, override?: Partial<AppSettings>) {
   if (!override) {
     return base;
   }
 
   const aiOverride = isRecord(override.ai) ? override.ai : {};
 
-  return normalizeDesktopSettings({
+  return normalizeSettings({
     ...base,
     ...override,
     ai: {
@@ -123,41 +123,41 @@ function mergeDesktopSettings(base: DesktopAppSettings, override?: Partial<Deskt
   });
 }
 
-function hasPersistedCustomSettings(value: DesktopAppSettings) {
+function hasPersistedCustomSettings(value: AppSettings) {
   return value.updatedAt !== null
-    || value.displayName !== DEFAULT_DESKTOP_SETTINGS.displayName
-    || value.theme !== DEFAULT_DESKTOP_SETTINGS.theme
-    || value.ai.enabled !== DEFAULT_DESKTOP_SETTINGS.ai.enabled
-    || value.ai.provider !== DEFAULT_DESKTOP_SETTINGS.ai.provider
-    || value.ai.baseUrl !== DEFAULT_DESKTOP_SETTINGS.ai.baseUrl
-    || value.ai.model !== DEFAULT_DESKTOP_SETTINGS.ai.model
-    || value.ai.apiKey !== DEFAULT_DESKTOP_SETTINGS.ai.apiKey;
+    || value.displayName !== DEFAULT_SETTINGS.displayName
+    || value.theme !== DEFAULT_SETTINGS.theme
+    || value.ai.enabled !== DEFAULT_SETTINGS.ai.enabled
+    || value.ai.provider !== DEFAULT_SETTINGS.ai.provider
+    || value.ai.baseUrl !== DEFAULT_SETTINGS.ai.baseUrl
+    || value.ai.model !== DEFAULT_SETTINGS.ai.model
+    || value.ai.apiKey !== DEFAULT_SETTINGS.ai.apiKey;
 }
 
 function readSettingsFromLocalStorage() {
   if (typeof window === "undefined") {
-    return DEFAULT_DESKTOP_SETTINGS;
+    return DEFAULT_SETTINGS;
   }
 
   const rawValue = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
   if (!rawValue) {
-    return DEFAULT_DESKTOP_SETTINGS;
+    return DEFAULT_SETTINGS;
   }
 
   try {
-    return normalizeDesktopSettings(JSON.parse(rawValue));
+    return normalizeSettings(JSON.parse(rawValue));
   } catch {
-    return DEFAULT_DESKTOP_SETTINGS;
+    return DEFAULT_SETTINGS;
   }
 }
 
-function writeSettingsToLocalStorage(value: DesktopAppSettings) {
+function writeSettingsToLocalStorage(value: AppSettings) {
   if (typeof window !== "undefined") {
     window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(value));
   }
 }
 
-async function invokeDesktopSettingsCommand<T>(command: DesktopSettingsCommand, args?: Record<string, unknown>) {
+async function invokeSettingsCommand<T>(command: SettingsCommand, args?: Record<string, unknown>) {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     return await invoke<T>(command, args);
@@ -166,12 +166,12 @@ async function invokeDesktopSettingsCommand<T>(command: DesktopSettingsCommand, 
   }
 }
 
-async function persistDesktopSettingsToTauri(value: DesktopAppSettings) {
-  const response = await invokeDesktopSettingsCommand<DesktopAppSettings>("save_desktop_settings", { settings: value });
-  return response ? normalizeDesktopSettings(response) : null;
+async function persistSettingsToTauri(value: AppSettings) {
+  const response = await invokeSettingsCommand<AppSettings>("save_settings", { settings: value });
+  return response ? normalizeSettings(response) : null;
 }
 
-function normalizeAiConnectionTestResult(value: unknown, fallback: DesktopAiProviderSettings): DesktopAiConnectionTestResult {
+function normalizeAiConnectionTestResult(value: unknown, fallback: AiProviderSettings): AiConnectionTestResult {
   const record = isRecord(value) ? value : {};
 
   return {
@@ -184,22 +184,22 @@ function normalizeAiConnectionTestResult(value: unknown, fallback: DesktopAiProv
   };
 }
 
-export function getCachedDesktopSettings(fallback?: DesktopAppSettings) {
-  return mergeDesktopSettings(readSettingsFromLocalStorage(), fallback);
+export function getCachedSettings(fallback?: AppSettings) {
+  return mergeSettings(readSettingsFromLocalStorage(), fallback);
 }
 
-export async function loadDesktopSettings(fallback?: DesktopAppSettings) {
-  const cachedSettings = getCachedDesktopSettings(fallback);
-  const response = await invokeDesktopSettingsCommand<DesktopAppSettings>("load_desktop_settings");
+export async function loadSettings(fallback?: AppSettings) {
+  const cachedSettings = getCachedSettings(fallback);
+  const response = await invokeSettingsCommand<AppSettings>("load_settings");
 
   if (!response) {
     writeSettingsToLocalStorage(cachedSettings);
     return cachedSettings;
   }
 
-  const tauriSettings = normalizeDesktopSettings(response);
+  const tauriSettings = normalizeSettings(response);
   if (!tauriSettings.ai.apiKey && cachedSettings.ai.apiKey) {
-    const migratedSettings = await persistDesktopSettingsToTauri({
+    const migratedSettings = await persistSettingsToTauri({
       ...tauriSettings,
       ai: {
         ...tauriSettings.ai,
@@ -208,15 +208,15 @@ export async function loadDesktopSettings(fallback?: DesktopAppSettings) {
     });
 
     if (migratedSettings) {
-      writeSettingsToLocalStorage(stripDesktopSettingsSecrets(migratedSettings));
+      writeSettingsToLocalStorage(stripSettingsSecrets(migratedSettings));
       return migratedSettings;
     }
   }
 
   if (tauriSettings.updatedAt === null && hasPersistedCustomSettings(cachedSettings)) {
-    const migratedSettings = await persistDesktopSettingsToTauri(cachedSettings);
+    const migratedSettings = await persistSettingsToTauri(cachedSettings);
     if (migratedSettings) {
-      writeSettingsToLocalStorage(stripDesktopSettingsSecrets(migratedSettings));
+      writeSettingsToLocalStorage(stripSettingsSecrets(migratedSettings));
       return migratedSettings;
     }
 
@@ -224,19 +224,19 @@ export async function loadDesktopSettings(fallback?: DesktopAppSettings) {
     return cachedSettings;
   }
 
-  writeSettingsToLocalStorage(stripDesktopSettingsSecrets(tauriSettings));
+  writeSettingsToLocalStorage(stripSettingsSecrets(tauriSettings));
   return tauriSettings;
 }
 
-export async function saveDesktopSettings(value: DesktopAppSettings) {
-  const nextSettings = normalizeDesktopSettings({
+export async function saveSettings(value: AppSettings) {
+  const nextSettings = normalizeSettings({
     ...value,
     updatedAt: new Date().toISOString(),
   });
 
-  const persistedSettings = await persistDesktopSettingsToTauri(nextSettings);
+  const persistedSettings = await persistSettingsToTauri(nextSettings);
   if (persistedSettings) {
-    writeSettingsToLocalStorage(stripDesktopSettingsSecrets(persistedSettings));
+    writeSettingsToLocalStorage(stripSettingsSecrets(persistedSettings));
     return persistedSettings;
   }
 
@@ -244,14 +244,14 @@ export async function saveDesktopSettings(value: DesktopAppSettings) {
   return nextSettings;
 }
 
-export function getDefaultDesktopSettings() {
-  return DEFAULT_DESKTOP_SETTINGS;
+export function getDefaultSettings() {
+  return DEFAULT_SETTINGS;
 }
 
-export function validateDesktopAiSettings(
-  value: DesktopAiProviderSettings,
-  options?: DesktopAiValidationOptions,
-): DesktopAiValidationResult {
+export function validateAiSettings(
+  value: AiProviderSettings,
+  options?: AiValidationOptions,
+): AiValidationResult {
   if (!value.enabled && !options?.allowDisabled) {
     return {
       ok: true,
@@ -315,9 +315,9 @@ export function validateDesktopAiSettings(
   };
 }
 
-export async function testDesktopAiConnection(value: DesktopAiProviderSettings): Promise<DesktopAiConnectionTestResult> {
+export async function testAiConnection(value: AiProviderSettings): Promise<AiConnectionTestResult> {
   const normalizedSettings = normalizeAiSettings(value);
-  const response = await invokeDesktopSettingsCommand<DesktopAiConnectionTestResult>("test_desktop_ai_connection", {
+  const response = await invokeSettingsCommand<AiConnectionTestResult>("test_ai_connection", {
     settings: normalizedSettings,
   });
 

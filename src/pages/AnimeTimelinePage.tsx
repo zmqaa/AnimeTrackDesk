@@ -3,17 +3,17 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import type { WatchHistoryRecord } from "@/lib/dashboard-types";
-import { formatLocalTimeString } from "@/src/lib/local-date-time";
-import { loadDesktopWatchHistoryRecords } from "@/src/lib/desktop-anime-store";
+import { formatLocalTimeString } from "@/lib/local-date-time";
+import { loadWatchHistoryRecords } from "@/src/lib/anime-store";
 
-export default function DesktopAnimeTimelinePage() {
+export default function AnimeTimelinePage() {
   const [history, setHistory] = useState<WatchHistoryRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const detailReturnTo = "/anime/timeline";
 
   useEffect(() => {
     try {
-      setHistory(loadDesktopWatchHistoryRecords());
+      setHistory(loadWatchHistoryRecords());
     } finally {
       setLoading(false);
     }

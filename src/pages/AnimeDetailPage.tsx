@@ -1,16 +1,16 @@
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { normalizeStringArray } from "@/lib/anime-cast";
-import { analyzeAnimePreferenceInsight } from "@/src/lib/anime-preference-insights";
-import { formatLocalDateString, formatLocalDateTimeString } from "@/src/lib/local-date-time";
+import { analyzeAnimePreferenceInsight } from "@/lib/anime-preference-insights";
+import { formatLocalDateString, formatLocalDateTimeString } from "@/lib/local-date-time";
 import type { AnimeDetailItem, AnimeStatus } from "@/lib/anime-shared";
 import {
-  deleteDesktopAnimeItem,
-  loadDesktopAnimeDetailItem,
-  loadDesktopAnimeListItems,
-  type DesktopAnimeDetailPatchInput,
-  updateDesktopAnimeDetailItem,
-} from "@/src/lib/desktop-anime-store";
-import { enrichDesktopAnimeEntryMetadata } from "@/src/lib/desktop-anime-enrichment";
+  deleteAnimeItem,
+  loadAnimeDetailItem,
+  loadAnimeListItems,
+  type AnimeDetailPatchInput,
+  updateAnimeDetailItem,
+} from "@/src/lib/anime-store";
+import { enrichAnimeEntryMetadata } from "@/src/lib/anime-metadata-enrichment";
 import {
   ArrowLeftIcon,
   CalendarIcon,
@@ -61,7 +61,7 @@ const editableKeys = [
   "premiereDate",
   "cast",
   "isFinished",
-] as const satisfies readonly (keyof DesktopAnimeDetailPatchInput)[];
+] as const satisfies readonly (keyof AnimeDetailPatchInput)[];
 const arrayKeys = new Set<(typeof editableKeys)[number]>(["tags", "cast"]);
 const requiredNumericKeys = new Set<(typeof editableKeys)[number]>(["progress"]);
 const nullableNumericKeys = new Set<(typeof editableKeys)[number]>(["score", "totalEpisodes", "durationMinutes"]);
@@ -188,8 +188,8 @@ function isFieldValueUnchanged(key: EditableField, nextValue: unknown, currentVa
   return nextValue === currentValue;
 }
 
-function buildChangedPayload(formData: AnimeDetailFormData, item: AnimeDetailItem): DesktopAnimeDetailPatchInput {
-  const payload: DesktopAnimeDetailPatchInput = {};
+function buildChangedPayload(formData: AnimeDetailFormData, item: AnimeDetailItem): AnimeDetailPatchInput {
+  const payload: AnimeDetailPatchInput = {};
 
   for (const key of editableKeys) {
     const normalizedValue = normalizeEditableFieldValue(key, formData[key]);
@@ -207,7 +207,7 @@ function buildChangedPayload(formData: AnimeDetailFormData, item: AnimeDetailIte
   return payload;
 }
 
-export default function DesktopAnimeDetailPage() {
+export default function AnimeDetailPage() {
   const params = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -237,7 +237,7 @@ export default function DesktopAnimeDetailPage() {
     }
 
     try {
-      const data = loadDesktopAnimeDetailItem(animeId);
+      const data = loadAnimeDetailItem(animeId);
       setItem(data);
       setFormData(data || {});
     } catch (error) {
@@ -285,7 +285,7 @@ export default function DesktopAnimeDetailPage() {
 
     setSaving(true);
     try {
-      const response = updateDesktopAnimeDetailItem(animeId, payload);
+      const response = updateAnimeDetailItem(animeId, payload);
       setItem(response.entry);
       setFormData(response.entry);
       setIsEditing(false);
@@ -304,7 +304,7 @@ export default function DesktopAnimeDetailPage() {
 
     setIsAiEnriching(true);
     try {
-      const result = await enrichDesktopAnimeEntryMetadata(item);
+      const result = await enrichAnimeEntryMetadata(item);
 
       if (result.appliedFields.length === 0) {
         if (!result.usedAi && !result.usedProvider) {
@@ -315,7 +315,7 @@ export default function DesktopAnimeDetailPage() {
         return;
       }
 
-      const response = updateDesktopAnimeDetailItem(animeId, result.patch);
+      const response = updateAnimeDetailItem(animeId, result.patch);
       setItem(response.entry);
       setFormData(response.entry);
 
@@ -344,7 +344,7 @@ export default function DesktopAnimeDetailPage() {
 
     setShowDeleteConfirm(false);
     try {
-      deleteDesktopAnimeItem(animeId);
+      deleteAnimeItem(animeId);
       toast.success("已删除");
       navigate(returnTo, { replace: true });
     } catch (error) {
@@ -387,7 +387,7 @@ export default function DesktopAnimeDetailPage() {
         tags: displayTags,
         summary: typeof formData.summary === "string" ? formData.summary : item.summary,
       },
-      loadDesktopAnimeListItems(),
+      loadAnimeListItems(),
     );
   }, [displayTags, formData.summary, item]);
 

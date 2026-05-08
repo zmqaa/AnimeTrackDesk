@@ -35,6 +35,20 @@ export interface AnimeMetadataLookupResult {
     trace: AnimeMetadataQueryTrace[];
 }
 
+export interface AnimeMetadataSearchCandidate {
+    id: number;
+    title: string;
+    originalTitle?: string;
+    coverUrl?: string;
+    score?: number;
+    description?: string;
+    premiereDate?: string;
+    totalEpisodes?: number;
+    durationMinutes?: number;
+    tags?: string[];
+    isFinished?: boolean;
+}
+
 function normalizeDateString(value: Date | string | number | null | undefined) {
     if (!value) {
         return undefined;
@@ -114,6 +128,40 @@ function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Respo
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
+function extractSubjectTags(detail: BangumiV0Subject) {
+    return Array.isArray(detail.tags)
+        ? detail.tags.sort((a, b) => (b.count ?? 0) - (a.count ?? 0)).slice(0, 12).map((tag) => tag.name).filter(Boolean)
+        : undefined;
+}
+
+function extractSubjectTotalEpisodes(detail: BangumiV0Subject) {
+    if (detail.eps && detail.eps > 0) {
+        return detail.eps;
+    }
+
+    const entry = detail.infobox?.find((item) => item.key === '话数' || item.key === '集数');
+    const parsed = parseInt(String(entry?.value ?? ''), 10);
+    return !Number.isNaN(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function toAnimeMetadataSearchCandidate(detail: BangumiV0Subject): AnimeMetadataSearchCandidate {
+    return {
+        id: detail.id,
+        title: detail.name_cn || detail.name,
+        originalTitle: detail.name,
+        coverUrl: detail.images?.large ?? detail.images?.common ?? detail.images?.medium,
+        score: detail.rating?.score && detail.rating.score > 0
+            ? Math.round(detail.rating.score * 10) / 10
+            : undefined,
+        description: detail.summary?.trim() || undefined,
+        premiereDate: normalizeDate(detail.date),
+        totalEpisodes: extractSubjectTotalEpisodes(detail),
+        durationMinutes: extractDurationMinutes(detail),
+        tags: extractSubjectTags(detail),
+        isFinished: extractIsFinished(detail),
+    };
 }
 
 /**
@@ -295,17 +343,8 @@ export async function fetchAnimeMetadataByQueriesWithTrace(
 
         if (!detail) continue;
 
-        const tags = Array.isArray(detail.tags)
-            ? detail.tags.sort((a, b) => (b.count ?? 0) - (a.count ?? 0)).slice(0, 12).map(t => t.name).filter(Boolean)
-            : undefined;
-
-        const totalEpisodes = (detail.eps && detail.eps > 0)
-            ? detail.eps
-            : (() => {
-                const entry = detail.infobox?.find(i => i.key === '话数' || i.key === '集数');
-                const n = parseInt(String(entry?.value ?? ''), 10);
-                return !isNaN(n) && n > 0 ? n : undefined;
-            })();
+        const tags = extractSubjectTags(detail);
+        const totalEpisodes = extractSubjectTotalEpisodes(detail);
 
         return {
             metadata: {
@@ -335,5 +374,15 @@ export async function fetchAnimeMetadataByQueries(
 ): Promise<AnimeMetadata | null> {
     const result = await fetchAnimeMetadataByQueriesWithTrace(...queries);
     return result.metadata;
+}
+
+export async function searchAnimeMetadataCandidatesByKeyword(keyword: string): Promise<AnimeMetadataSearchCandidate[]> {
+    const trimmedKeyword = keyword.trim();
+    if (!trimmedKeyword) {
+        return [];
+    }
+
+    const subjects = await searchBangumiV0(trimmedKeyword);
+    return subjects.map(toAnimeMetadataSearchCandidate);
 }
 

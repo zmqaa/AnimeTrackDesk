@@ -11,7 +11,7 @@ if (-not (Test-Path $packageJsonPath)) {
 }
 
 if (-not (Test-Path $sourceExePath)) {
-  throw "Desktop executable not found: $sourceExePath. Run npm run tauri build first."
+  throw "Desktop executable not found: $sourceExePath. Run npm run build:portable first, or run tauri build --no-bundle before packaging."
 }
 
 $packageJson = Get-Content $packageJsonPath -Raw | ConvertFrom-Json
@@ -57,3 +57,4 @@ if (Test-Path $portableZipPath) {
 Compress-Archive -Path $stagingDir -DestinationPath $portableZipPath -Force
 
 Write-Host "Portable bundle created: $portableZipPath"
+Write-Host "Tip: use npm run build:portable to rebuild the exe and package it as a zip in one step."

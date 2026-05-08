@@ -1,6 +1,6 @@
 use std::{collections::HashSet, fs, path::{Path, PathBuf}};
 
-use crate::secure_storage::{self, DesktopSecretKey};
+use crate::secure_storage::{self, SecretKey};
 use chrono::{DateTime, Local};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -15,7 +15,7 @@ const MAX_BACKUP_RECORDS: usize = 12;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DesktopAiProviderSettings {
+pub struct AiProviderSettings {
   pub enabled: bool,
   pub provider: String,
   pub base_url: String,
@@ -25,16 +25,16 @@ pub struct DesktopAiProviderSettings {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DesktopAppSettings {
+pub struct AppSettings {
   pub display_name: String,
   pub theme: String,
-  pub ai: DesktopAiProviderSettings,
+  pub ai: AiProviderSettings,
   pub updated_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DesktopAnimeStorageEntry {
+pub struct AnimeStorageEntry {
   pub id: String,
   pub title: String,
   pub season: String,
@@ -61,7 +61,7 @@ pub struct DesktopAnimeStorageEntry {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DesktopWatchHistoryEntry {
+pub struct WatchHistoryEntry {
   pub id: String,
   pub anime_id: String,
   pub anime_title: String,
@@ -72,24 +72,24 @@ pub struct DesktopWatchHistoryEntry {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DesktopAnimeStorageSnapshot {
-  pub entries: Vec<DesktopAnimeStorageEntry>,
-  pub history: Vec<DesktopWatchHistoryEntry>,
+pub struct AnimeStorageSnapshot {
+  pub entries: Vec<AnimeStorageEntry>,
+  pub history: Vec<WatchHistoryEntry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DesktopBackupPayload {
+pub struct BackupPayload {
   pub schema_version: i64,
   pub source: String,
   pub created_at: String,
-  pub entries: Vec<DesktopAnimeStorageEntry>,
-  pub history: Vec<DesktopWatchHistoryEntry>,
+  pub entries: Vec<AnimeStorageEntry>,
+  pub history: Vec<WatchHistoryEntry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DesktopBackupFile {
+pub struct BackupFile {
   pub name: String,
   pub size: i64,
   pub created_at: String,
@@ -293,7 +293,7 @@ fn resolve_ai_api_key(connection: &Connection, legacy_value: Option<String>) -> 
     .map(normalize_optional_text)
     .unwrap_or_default();
 
-  let secure_api_key = secure_storage::load_secret_value(DesktopSecretKey::AiApiKey)?;
+  let secure_api_key = secure_storage::load_secret_value(SecretKey::AiApiKey)?;
 
   match secure_api_key {
     Some(value) => {
@@ -304,7 +304,7 @@ fn resolve_ai_api_key(connection: &Connection, legacy_value: Option<String>) -> 
       Ok(value)
     }
     None if !legacy_api_key.is_empty() => {
-      secure_storage::save_secret_value(DesktopSecretKey::AiApiKey, &legacy_api_key)?;
+      secure_storage::save_secret_value(SecretKey::AiApiKey, &legacy_api_key)?;
       clear_legacy_ai_api_key(connection)?;
       Ok(legacy_api_key)
     }
@@ -312,11 +312,11 @@ fn resolve_ai_api_key(connection: &Connection, legacy_value: Option<String>) -> 
   }
 }
 
-fn parse_backup_payload_text(raw_text: &str) -> Result<DesktopBackupPayload, String> {
-  serde_json::from_str::<DesktopBackupPayload>(raw_text).map_err(|error| error.to_string())
+fn parse_backup_payload_text(raw_text: &str) -> Result<BackupPayload, String> {
+  serde_json::from_str::<BackupPayload>(raw_text).map_err(|error| error.to_string())
 }
 
-fn read_backup_payload(database_path: &Path, name: &str) -> Result<(DesktopBackupPayload, i64), String> {
+fn read_backup_payload(database_path: &Path, name: &str) -> Result<(BackupPayload, i64), String> {
   let directory = resolve_backup_directory(database_path)?;
   let safe_name = sanitize_backup_file_name(name)?;
   let path = directory.join(&safe_name);
@@ -405,7 +405,7 @@ fn serialize_json_string_array(values: &[String]) -> Result<String, String> {
   serde_json::to_string(values).map_err(|error| error.to_string())
 }
 
-fn upsert_anime_entry(connection: &Connection, entry: &DesktopAnimeStorageEntry) -> Result<(), String> {
+fn upsert_anime_entry(connection: &Connection, entry: &AnimeStorageEntry) -> Result<(), String> {
   let tags_json = serialize_json_string_array(&entry.tags)?;
   let cast_json = entry
     .cast
@@ -503,7 +503,7 @@ fn upsert_anime_entry(connection: &Connection, entry: &DesktopAnimeStorageEntry)
   Ok(())
 }
 
-fn upsert_watch_history_entry(connection: &Connection, record: &DesktopWatchHistoryEntry) -> Result<(), String> {
+fn upsert_watch_history_entry(connection: &Connection, record: &WatchHistoryEntry) -> Result<(), String> {
   connection
     .execute(
       r#"
@@ -522,7 +522,7 @@ fn upsert_watch_history_entry(connection: &Connection, record: &DesktopWatchHist
   Ok(())
 }
 
-pub fn load_desktop_settings(database_path: &Path) -> Result<DesktopAppSettings, String> {
+pub fn load_settings(database_path: &Path) -> Result<AppSettings, String> {
   let connection = open_database(database_path)?;
   let display_name = read_app_setting(&connection, "display_name")?;
   let theme = read_app_setting(&connection, "theme")?;
@@ -550,7 +550,7 @@ pub fn load_desktop_settings(database_path: &Path) -> Result<DesktopAppSettings,
     ai.as_ref().map(|(_, _, _, api_key, _, _)| api_key.clone()),
   )?;
 
-  Ok(DesktopAppSettings {
+  Ok(AppSettings {
     display_name: display_name
       .as_ref()
       .map(|(value, _)| normalize_required_text(value, DEFAULT_DISPLAY_NAME))
@@ -559,7 +559,7 @@ pub fn load_desktop_settings(database_path: &Path) -> Result<DesktopAppSettings,
       .as_ref()
       .map(|(value, _)| normalize_required_text(value, DEFAULT_THEME))
       .unwrap_or_else(|| DEFAULT_THEME.to_string()),
-    ai: DesktopAiProviderSettings {
+    ai: AiProviderSettings {
       enabled: ai.as_ref().map(|(_, _, _, _, enabled, _)| *enabled).unwrap_or(false),
       provider: ai
         .as_ref()
@@ -583,7 +583,7 @@ pub fn load_desktop_settings(database_path: &Path) -> Result<DesktopAppSettings,
   })
 }
 
-pub fn save_desktop_settings(database_path: &Path, settings: DesktopAppSettings) -> Result<DesktopAppSettings, String> {
+pub fn save_settings(database_path: &Path, settings: AppSettings) -> Result<AppSettings, String> {
   let mut connection = open_database(database_path)?;
   let transaction = connection.transaction().map_err(|error| error.to_string())?;
 
@@ -595,9 +595,9 @@ pub fn save_desktop_settings(database_path: &Path, settings: DesktopAppSettings)
   let ai_api_key = normalize_optional_text(&settings.ai.api_key);
 
   if ai_api_key.is_empty() {
-    secure_storage::delete_secret_value(DesktopSecretKey::AiApiKey)?;
+    secure_storage::delete_secret_value(SecretKey::AiApiKey)?;
   } else {
-    secure_storage::save_secret_value(DesktopSecretKey::AiApiKey, &ai_api_key)?;
+    secure_storage::save_secret_value(SecretKey::AiApiKey, &ai_api_key)?;
   }
 
   transaction
@@ -647,10 +647,10 @@ pub fn save_desktop_settings(database_path: &Path, settings: DesktopAppSettings)
     .map_err(|error| error.to_string())?;
 
   transaction.commit().map_err(|error| error.to_string())?;
-  load_desktop_settings(database_path)
+  load_settings(database_path)
 }
 
-pub fn load_desktop_anime_snapshot(database_path: &Path) -> Result<DesktopAnimeStorageSnapshot, String> {
+pub fn load_anime_snapshot(database_path: &Path) -> Result<AnimeStorageSnapshot, String> {
   let connection = open_database(database_path)?;
   let mut anime_statement = connection
     .prepare(
@@ -689,7 +689,7 @@ pub fn load_desktop_anime_snapshot(database_path: &Path) -> Result<DesktopAnimeS
       let cast = parse_json_string_array(row.get::<_, Option<String>>(19)?);
       let cast_aliases = parse_json_string_array(row.get::<_, Option<String>>(20)?);
 
-      Ok(DesktopAnimeStorageEntry {
+      Ok(AnimeStorageEntry {
         id: row.get(0)?,
         title: row.get(1)?,
         season: row.get(2)?,
@@ -739,7 +739,7 @@ pub fn load_desktop_anime_snapshot(database_path: &Path) -> Result<DesktopAnimeS
 
   let history_rows = history_statement
     .query_map([], |row| {
-      Ok(DesktopWatchHistoryEntry {
+      Ok(WatchHistoryEntry {
         id: row.get(0)?,
         anime_id: row.get(1)?,
         anime_title: row.get(2)?,
@@ -754,13 +754,13 @@ pub fn load_desktop_anime_snapshot(database_path: &Path) -> Result<DesktopAnimeS
     .collect::<Result<Vec<_>, _>>()
     .map_err(|error| error.to_string())?;
 
-  Ok(DesktopAnimeStorageSnapshot { entries, history })
+  Ok(AnimeStorageSnapshot { entries, history })
 }
 
-pub fn save_desktop_anime_snapshot(
+pub fn save_anime_snapshot(
   database_path: &Path,
-  snapshot: DesktopAnimeStorageSnapshot,
-) -> Result<DesktopAnimeStorageSnapshot, String> {
+  snapshot: AnimeStorageSnapshot,
+) -> Result<AnimeStorageSnapshot, String> {
   let mut connection = open_database(database_path)?;
   let transaction = connection.transaction().map_err(|error| error.to_string())?;
 
@@ -786,13 +786,13 @@ pub fn save_desktop_anime_snapshot(
   }
 
   transaction.commit().map_err(|error| error.to_string())?;
-  load_desktop_anime_snapshot(database_path)
+  load_anime_snapshot(database_path)
 }
 
-pub fn upsert_desktop_anime_entry(
+pub fn upsert_anime_entry_record(
   database_path: &Path,
-  entry: DesktopAnimeStorageEntry,
-) -> Result<DesktopAnimeStorageEntry, String> {
+  entry: AnimeStorageEntry,
+) -> Result<AnimeStorageEntry, String> {
   let mut connection = open_database(database_path)?;
   let transaction = connection.transaction().map_err(|error| error.to_string())?;
 
@@ -802,10 +802,10 @@ pub fn upsert_desktop_anime_entry(
   Ok(entry)
 }
 
-pub fn save_desktop_watch_history_entry(
+pub fn save_watch_history_entry(
   database_path: &Path,
-  record: DesktopWatchHistoryEntry,
-) -> Result<DesktopWatchHistoryEntry, String> {
+  record: WatchHistoryEntry,
+) -> Result<WatchHistoryEntry, String> {
   let mut connection = open_database(database_path)?;
   let transaction = connection.transaction().map_err(|error| error.to_string())?;
 
@@ -815,7 +815,7 @@ pub fn save_desktop_watch_history_entry(
   Ok(record)
 }
 
-pub fn delete_desktop_anime_entries(database_path: &Path, ids: Vec<String>) -> Result<usize, String> {
+pub fn delete_anime_entries(database_path: &Path, ids: Vec<String>) -> Result<usize, String> {
   let mut connection = open_database(database_path)?;
   let transaction = connection.transaction().map_err(|error| error.to_string())?;
   let mut deleted = 0;
@@ -830,7 +830,7 @@ pub fn delete_desktop_anime_entries(database_path: &Path, ids: Vec<String>) -> R
   Ok(deleted)
 }
 
-pub fn delete_desktop_watch_history_entries(database_path: &Path, ids: Vec<String>) -> Result<usize, String> {
+pub fn delete_watch_history_entries(database_path: &Path, ids: Vec<String>) -> Result<usize, String> {
   let mut connection = open_database(database_path)?;
   let transaction = connection.transaction().map_err(|error| error.to_string())?;
   let mut deleted = 0;
@@ -845,7 +845,7 @@ pub fn delete_desktop_watch_history_entries(database_path: &Path, ids: Vec<Strin
   Ok(deleted)
 }
 
-pub fn list_desktop_backups(database_path: &Path) -> Result<Vec<DesktopBackupFile>, String> {
+pub fn list_backups(database_path: &Path) -> Result<Vec<BackupFile>, String> {
   let directory = resolve_backup_directory(database_path)?;
   let mut backups = fs::read_dir(&directory)
     .map_err(|error| error.to_string())?
@@ -857,7 +857,7 @@ pub fn list_desktop_backups(database_path: &Path) -> Result<Vec<DesktopBackupFil
       let payload = parse_backup_payload_text(&content).ok()?;
       let size = entry.metadata().ok()?.len().try_into().ok()?;
 
-      Some(DesktopBackupFile {
+      Some(BackupFile {
         name,
         size,
         created_at: payload.created_at,
@@ -869,10 +869,10 @@ pub fn list_desktop_backups(database_path: &Path) -> Result<Vec<DesktopBackupFil
   Ok(backups)
 }
 
-pub fn save_desktop_backup(
+pub fn save_backup(
   database_path: &Path,
-  payload: DesktopBackupPayload,
-) -> Result<DesktopBackupFile, String> {
+  payload: BackupPayload,
+) -> Result<BackupFile, String> {
   let directory = resolve_backup_directory(database_path)?;
   let name = create_backup_name(&payload.created_at);
   let path = directory.join(&name);
@@ -887,19 +887,19 @@ pub fn save_desktop_backup(
     .try_into()
     .map_err(|_| "备份文件过大".to_string())?;
 
-  Ok(DesktopBackupFile {
+  Ok(BackupFile {
     name,
     size,
     created_at: payload.created_at,
   })
 }
 
-pub fn read_desktop_backup(database_path: &Path, name: &str) -> Result<DesktopBackupPayload, String> {
+pub fn read_backup(database_path: &Path, name: &str) -> Result<BackupPayload, String> {
   let (payload, _) = read_backup_payload(database_path, name)?;
   Ok(payload)
 }
 
-pub fn delete_desktop_backup(database_path: &Path, name: &str) -> Result<(), String> {
+pub fn delete_backup(database_path: &Path, name: &str) -> Result<(), String> {
   let directory = resolve_backup_directory(database_path)?;
   let safe_name = sanitize_backup_file_name(name)?;
   let path = directory.join(safe_name);

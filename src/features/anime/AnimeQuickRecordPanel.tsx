@@ -1,18 +1,18 @@
 "use client";
 
 import { CheckCircleIcon, ClockIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, SparklesIcon } from '@heroicons/react/24/outline';
-import type { DesktopQuickRecordTraceEvent } from '@/src/lib/desktop-ai-quick-record';
+import type { QuickRecordTraceEvent } from '@/src/lib/quick-record';
 
 type AnimeQuickRecordPanelProps = {
   quickInput: string;
   quickLoading: boolean;
   quickMessage: string;
-  quickTrace: DesktopQuickRecordTraceEvent[];
+  quickTrace: QuickRecordTraceEvent[];
   onInputChange: (value: string) => void;
   onSubmit: () => void;
 };
 
-function getTraceIcon(event: DesktopQuickRecordTraceEvent) {
+function getTraceIcon(event: QuickRecordTraceEvent) {
   if (event.status === 'error') {
     return <ExclamationTriangleIcon className="h-4 w-4 text-red-400" />;
   }

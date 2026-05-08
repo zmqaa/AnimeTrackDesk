@@ -4,8 +4,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { AnimeRecord, AnimeStatus, ParsedWatchHistory } from '@/lib/dashboard-types';
 import { readSessionCache, writeSessionCache } from '@/lib/hooks-shared';
-import { DESKTOP_DASHBOARD_CACHE_KEYS } from '@/src/lib/desktop-dashboard-shared';
-import { loadDesktopDashboardAnimeRecords } from '@/src/lib/desktop-anime-store';
+import { DASHBOARD_CACHE_KEYS } from '@/lib/dashboard-shared';
+import { loadDashboardAnimeRecords } from '@/src/lib/anime-store';
 
 export function useAnimeData(parsedHistory: ParsedWatchHistory[] = []) {
     const [animeList, setAnimeList] = useState<AnimeRecord[]>([]);
@@ -13,7 +13,7 @@ export function useAnimeData(parsedHistory: ParsedWatchHistory[] = []) {
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     useEffect(() => {
-        const cached = readSessionCache<AnimeRecord[]>(DESKTOP_DASHBOARD_CACHE_KEYS.dashboardAnime);
+        const cached = readSessionCache<AnimeRecord[]>(DASHBOARD_CACHE_KEYS.dashboardAnime);
         if (cached) {
             setAnimeList(cached);
             setIsLoading(false);
@@ -22,9 +22,9 @@ export function useAnimeData(parsedHistory: ParsedWatchHistory[] = []) {
 
         setIsRefreshing(true);
         try {
-            const entries = loadDesktopDashboardAnimeRecords();
+            const entries = loadDashboardAnimeRecords();
             setAnimeList(entries);
-            writeSessionCache(DESKTOP_DASHBOARD_CACHE_KEYS.dashboardAnime, entries);
+            writeSessionCache(DASHBOARD_CACHE_KEYS.dashboardAnime, entries);
         } catch (err) {
             console.error('Failed to load desktop anime data', err);
         } finally {

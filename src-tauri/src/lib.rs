@@ -20,7 +20,7 @@ struct RuntimeInfo {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct DesktopAiConnectionTestResult {
+struct AiConnectionTestResult {
   ok: bool,
   message: String,
   provider: String,
@@ -31,22 +31,22 @@ struct DesktopAiConnectionTestResult {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct DesktopSaveTextFileFilter {
+struct SaveTextFileFilter {
   name: String,
   extensions: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct DesktopSaveTextFileRequest {
+struct SaveTextFileRequest {
   suggested_name: String,
   content: String,
-  filters: Vec<DesktopSaveTextFileFilter>,
+  filters: Vec<SaveTextFileFilter>,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct DesktopSaveTextFileResult {
+struct SaveTextFileResult {
   canceled: bool,
   path: Option<String>,
 }
@@ -58,8 +58,8 @@ fn build_ai_test_result(
   endpoint: Option<String>,
   status_code: Option<u16>,
   latency_ms: Option<u64>,
-) -> DesktopAiConnectionTestResult {
-  DesktopAiConnectionTestResult {
+) -> AiConnectionTestResult {
+  AiConnectionTestResult {
     ok,
     message,
     provider,
@@ -100,9 +100,9 @@ fn parse_ai_json_content(content: &str) -> Result<Value, String> {
 }
 
 #[tauri::command]
-async fn parse_desktop_quick_record(
+async fn parse_quick_record(
   text: String,
-  settings: storage::DesktopAiProviderSettings,
+  settings: storage::AiProviderSettings,
 ) -> Result<Value, String> {
   let normalized_text = text.trim().to_string();
   if normalized_text.is_empty() {
@@ -231,9 +231,9 @@ async fn parse_desktop_quick_record(
 }
 
 #[tauri::command]
-async fn enrich_desktop_anime_metadata(
+async fn enrich_anime_metadata(
   query_name: String,
-  settings: storage::DesktopAiProviderSettings,
+  settings: storage::AiProviderSettings,
 ) -> Result<Value, String> {
   let normalized_query = query_name.trim().to_string();
   if normalized_query.is_empty() {
@@ -411,8 +411,8 @@ fn extract_ai_error_message(raw_text: &str) -> Option<String> {
   Some(shorten_text(normalized, 220))
 }
 
-fn build_save_text_file_result(canceled: bool, path: Option<String>) -> DesktopSaveTextFileResult {
-  DesktopSaveTextFileResult {
+fn build_save_text_file_result(canceled: bool, path: Option<String>) -> SaveTextFileResult {
+  SaveTextFileResult {
     canceled,
     path,
   }
@@ -440,43 +440,43 @@ fn get_runtime_info(app: tauri::AppHandle) -> Result<RuntimeInfo, String> {
 }
 
 #[tauri::command]
-fn load_desktop_settings(app: tauri::AppHandle) -> Result<storage::DesktopAppSettings, String> {
+fn load_settings(app: tauri::AppHandle) -> Result<storage::AppSettings, String> {
   let database_path = resolve_database_path(&app)?;
-  storage::load_desktop_settings(&database_path)
+  storage::load_settings(&database_path)
 }
 
 #[tauri::command]
-fn load_desktop_secret(key: String) -> Result<secure_storage::DesktopSecretValue, String> {
+fn load_secret(key: String) -> Result<secure_storage::SecretValue, String> {
   secure_storage::load_secret_by_name(&key)
 }
 
 #[tauri::command]
-fn save_desktop_secret(
+fn save_secret(
   key: String,
   value: String,
-) -> Result<secure_storage::DesktopSecretOperationResult, String> {
+) -> Result<secure_storage::SecretOperationResult, String> {
   secure_storage::save_secret_by_name(&key, &value)
 }
 
 #[tauri::command]
-fn delete_desktop_secret(key: String) -> Result<secure_storage::DesktopSecretOperationResult, String> {
+fn delete_secret(key: String) -> Result<secure_storage::SecretOperationResult, String> {
   secure_storage::delete_secret_by_name(&key)
 }
 
 #[tauri::command]
-fn save_desktop_settings(
+fn save_settings(
   app: tauri::AppHandle,
-  settings: storage::DesktopAppSettings,
-) -> Result<storage::DesktopAppSettings, String> {
+  settings: storage::AppSettings,
+) -> Result<storage::AppSettings, String> {
   let database_path = resolve_database_path(&app)?;
-  storage::save_desktop_settings(&database_path, settings)
+  storage::save_settings(&database_path, settings)
 }
 
 #[tauri::command]
-fn save_desktop_text_file(
+fn save_text_file(
   app: tauri::AppHandle,
-  request: DesktopSaveTextFileRequest,
-) -> Result<DesktopSaveTextFileResult, String> {
+  request: SaveTextFileRequest,
+) -> Result<SaveTextFileResult, String> {
   let suggested_name = request.suggested_name.trim();
   if suggested_name.is_empty() {
     return Err("缺少默认文件名。".to_string());
@@ -517,7 +517,7 @@ fn save_desktop_text_file(
 }
 
 #[tauri::command]
-async fn test_desktop_ai_connection(settings: storage::DesktopAiProviderSettings) -> DesktopAiConnectionTestResult {
+async fn test_ai_connection(settings: storage::AiProviderSettings) -> AiConnectionTestResult {
   let provider = if settings.provider.trim().is_empty() {
     "AI Provider".to_string()
   } else {
@@ -659,78 +659,78 @@ async fn test_desktop_ai_connection(settings: storage::DesktopAiProviderSettings
 }
 
 #[tauri::command]
-fn load_desktop_anime_snapshot(app: tauri::AppHandle) -> Result<storage::DesktopAnimeStorageSnapshot, String> {
+fn load_anime_snapshot(app: tauri::AppHandle) -> Result<storage::AnimeStorageSnapshot, String> {
   let database_path = resolve_database_path(&app)?;
-  storage::load_desktop_anime_snapshot(&database_path)
+  storage::load_anime_snapshot(&database_path)
 }
 
 #[tauri::command]
-fn save_desktop_anime_snapshot(
+fn save_anime_snapshot(
   app: tauri::AppHandle,
-  snapshot: storage::DesktopAnimeStorageSnapshot,
-) -> Result<storage::DesktopAnimeStorageSnapshot, String> {
+  snapshot: storage::AnimeStorageSnapshot,
+) -> Result<storage::AnimeStorageSnapshot, String> {
   let database_path = resolve_database_path(&app)?;
-  storage::save_desktop_anime_snapshot(&database_path, snapshot)
+  storage::save_anime_snapshot(&database_path, snapshot)
 }
 
 #[tauri::command]
-fn upsert_desktop_anime_entry(
+fn upsert_anime_entry(
   app: tauri::AppHandle,
-  entry: storage::DesktopAnimeStorageEntry,
-) -> Result<storage::DesktopAnimeStorageEntry, String> {
+  entry: storage::AnimeStorageEntry,
+) -> Result<storage::AnimeStorageEntry, String> {
   let database_path = resolve_database_path(&app)?;
-  storage::upsert_desktop_anime_entry(&database_path, entry)
+  storage::upsert_anime_entry_record(&database_path, entry)
 }
 
 #[tauri::command]
-fn save_desktop_watch_history_entry(
+fn save_watch_history_entry(
   app: tauri::AppHandle,
-  record: storage::DesktopWatchHistoryEntry,
-) -> Result<storage::DesktopWatchHistoryEntry, String> {
+  record: storage::WatchHistoryEntry,
+) -> Result<storage::WatchHistoryEntry, String> {
   let database_path = resolve_database_path(&app)?;
-  storage::save_desktop_watch_history_entry(&database_path, record)
+  storage::save_watch_history_entry(&database_path, record)
 }
 
 #[tauri::command]
-fn delete_desktop_anime_entries(app: tauri::AppHandle, ids: Vec<String>) -> Result<usize, String> {
+fn delete_anime_entries(app: tauri::AppHandle, ids: Vec<String>) -> Result<usize, String> {
   let database_path = resolve_database_path(&app)?;
-  storage::delete_desktop_anime_entries(&database_path, ids)
+  storage::delete_anime_entries(&database_path, ids)
 }
 
 #[tauri::command]
-fn delete_desktop_watch_history_entries(app: tauri::AppHandle, ids: Vec<String>) -> Result<usize, String> {
+fn delete_watch_history_entries(app: tauri::AppHandle, ids: Vec<String>) -> Result<usize, String> {
   let database_path = resolve_database_path(&app)?;
-  storage::delete_desktop_watch_history_entries(&database_path, ids)
+  storage::delete_watch_history_entries(&database_path, ids)
 }
 
 #[tauri::command]
-fn list_desktop_backups(app: tauri::AppHandle) -> Result<Vec<storage::DesktopBackupFile>, String> {
+fn list_backups(app: tauri::AppHandle) -> Result<Vec<storage::BackupFile>, String> {
   let database_path = resolve_database_path(&app)?;
-  storage::list_desktop_backups(&database_path)
+  storage::list_backups(&database_path)
 }
 
 #[tauri::command]
-fn save_desktop_backup(
+fn save_backup(
   app: tauri::AppHandle,
-  payload: storage::DesktopBackupPayload,
-) -> Result<storage::DesktopBackupFile, String> {
+  payload: storage::BackupPayload,
+) -> Result<storage::BackupFile, String> {
   let database_path = resolve_database_path(&app)?;
-  storage::save_desktop_backup(&database_path, payload)
+  storage::save_backup(&database_path, payload)
 }
 
 #[tauri::command]
-fn read_desktop_backup(
+fn read_backup(
   app: tauri::AppHandle,
   name: String,
-) -> Result<storage::DesktopBackupPayload, String> {
+) -> Result<storage::BackupPayload, String> {
   let database_path = resolve_database_path(&app)?;
-  storage::read_desktop_backup(&database_path, &name)
+  storage::read_backup(&database_path, &name)
 }
 
 #[tauri::command]
-fn delete_desktop_backup(app: tauri::AppHandle, name: String) -> Result<(), String> {
+fn delete_backup(app: tauri::AppHandle, name: String) -> Result<(), String> {
   let database_path = resolve_database_path(&app)?;
-  storage::delete_desktop_backup(&database_path, &name)
+  storage::delete_backup(&database_path, &name)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -748,25 +748,25 @@ pub fn run() {
     })
     .invoke_handler(tauri::generate_handler![
       get_runtime_info,
-      load_desktop_settings,
-      load_desktop_secret,
-      save_desktop_secret,
-      delete_desktop_secret,
-      save_desktop_settings,
-      save_desktop_text_file,
-      test_desktop_ai_connection,
-      parse_desktop_quick_record,
-      enrich_desktop_anime_metadata,
-      load_desktop_anime_snapshot,
-      save_desktop_anime_snapshot,
-      upsert_desktop_anime_entry,
-      save_desktop_watch_history_entry,
-      delete_desktop_anime_entries,
-      delete_desktop_watch_history_entries,
-      list_desktop_backups,
-      save_desktop_backup,
-      read_desktop_backup,
-      delete_desktop_backup
+      load_settings,
+      load_secret,
+      save_secret,
+      delete_secret,
+      save_settings,
+      save_text_file,
+      test_ai_connection,
+      parse_quick_record,
+      enrich_anime_metadata,
+      load_anime_snapshot,
+      save_anime_snapshot,
+      upsert_anime_entry,
+      save_watch_history_entry,
+      delete_anime_entries,
+      delete_watch_history_entries,
+      list_backups,
+      save_backup,
+      read_backup,
+      delete_backup
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

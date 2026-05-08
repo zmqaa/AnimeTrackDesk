@@ -29,6 +29,12 @@ export const navigationItems: NavigationItem[] = [
     section: '主馆区',
   },
   {
+    label: '推荐发现',
+    href: '/anime/recommendations',
+    description: '按片库口味找下一批想看番剧',
+    section: '主馆区',
+  },
+  {
     label: '图谱馆',
     href: '/anime/atlas',
     description: '制作与标签分布',

@@ -1,5 +1,5 @@
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
-import { formatLocalDateTimeString } from "@/src/lib/local-date-time";
+import { formatLocalDateTimeString } from "@/lib/local-date-time";
 import {
   Checkbox,
   DeleteButton,
@@ -9,15 +9,15 @@ import {
   SkeletonRows,
   useDebouncedSearch,
   useSelectableRows,
-} from "@/app/admin/admin-table-shared";
+} from "@/src/features/admin/admin-table-shared";
 import {
-  deleteDesktopAnimeItems,
-  deleteDesktopWatchHistoryItems,
-  loadDesktopAdminAnimeRecords,
-  loadDesktopAdminHistoryRecords,
-  type DesktopAdminAnimeRecord,
-  type DesktopAdminHistoryRecord,
-} from "@/src/lib/desktop-anime-store";
+  deleteAnimeItems,
+  deleteWatchHistoryItems,
+  loadAdminAnimeRecords,
+  loadAdminHistoryRecords,
+  type AdminAnimeRecord,
+  type AdminHistoryRecord,
+} from "@/src/lib/anime-store";
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -42,7 +42,7 @@ function formatDate(iso: string) {
 }
 
 function AnimeTab() {
-  const [records, setRecords] = useState<DesktopAdminAnimeRecord[]>([]);
+  const [records, setRecords] = useState<AdminAnimeRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
@@ -61,7 +61,7 @@ function AnimeTab() {
   const fetchRecords = useCallback(() => {
     setLoading(true);
     try {
-      const data = loadDesktopAdminAnimeRecords({ page, pageSize, search });
+      const data = loadAdminAnimeRecords({ page, pageSize, search });
       setRecords(data.records);
       setTotal(data.total);
     } catch (error) {
@@ -78,7 +78,7 @@ function AnimeTab() {
   const handleDelete = useCallback((ids: number[]) => {
     setDeleting(true);
     try {
-      const result = deleteDesktopAnimeItems(ids);
+      const result = deleteAnimeItems(ids);
       toast.success(`已删除 ${result.deleted} 条番剧记录`);
       removeSelected(ids);
 
@@ -177,7 +177,7 @@ function AnimeTab() {
 }
 
 function HistoryTab() {
-  const [records, setRecords] = useState<DesktopAdminHistoryRecord[]>([]);
+  const [records, setRecords] = useState<AdminHistoryRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
@@ -196,7 +196,7 @@ function HistoryTab() {
   const fetchRecords = useCallback(() => {
     setLoading(true);
     try {
-      const data = loadDesktopAdminHistoryRecords({ page, pageSize, search });
+      const data = loadAdminHistoryRecords({ page, pageSize, search });
       setRecords(data.records);
       setTotal(data.total);
     } catch (error) {
@@ -213,7 +213,7 @@ function HistoryTab() {
   const handleDelete = useCallback((ids: number[]) => {
     setDeleting(true);
     try {
-      const result = deleteDesktopWatchHistoryItems(ids);
+      const result = deleteWatchHistoryItems(ids);
       toast.success(`已删除 ${result.deleted} 条记录`);
       removeSelected(ids);
 
@@ -296,7 +296,7 @@ function HistoryTab() {
   );
 }
 
-export default function DesktopAdminPage() {
+export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("anime");
 
   return (

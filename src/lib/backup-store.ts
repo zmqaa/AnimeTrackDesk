@@ -1,78 +1,78 @@
 import type { AnimeStatus } from "@/lib/anime-shared";
-import { readDesktopRuntimeInfo } from "@/src/lib/desktop";
+import { readRuntimeInfo } from "@/src/lib/runtime";
 import {
-  getDesktopAnimeStorageSnapshot,
-  replaceDesktopAnimeStorageSnapshot,
-  type DesktopAnimeStorageEntry,
-} from "@/src/lib/desktop-anime-store";
+  getAnimeStorageSnapshot,
+  replaceAnimeStorageSnapshot,
+  type AnimeStorageEntry,
+} from "@/src/lib/anime-store";
 import type { WatchHistoryEntry } from "../types";
 
-export interface DesktopBackupFile {
+export interface BackupFile {
   name: string;
   size: number;
   createdAt: string;
 }
 
-interface StoredDesktopBackupFile extends DesktopBackupFile {
+interface StoredBackupFile extends BackupFile {
   content: string;
 }
 
-interface DesktopBackupPayload {
+interface BackupPayload {
   schemaVersion: 1;
   source: "animetrack";
   createdAt: string;
-  entries: DesktopAnimeStorageEntry[];
+  entries: AnimeStorageEntry[];
   history: WatchHistoryEntry[];
 }
 
-interface DesktopSaveTextFileFilter {
+interface SaveTextFileFilter {
   name: string;
   extensions: string[];
 }
 
-interface DesktopTextFileDescriptor {
+interface TextFileDescriptor {
   fileName: string;
   content: string;
   mimeType: string;
-  filters: DesktopSaveTextFileFilter[];
+  filters: SaveTextFileFilter[];
 }
 
-interface DesktopNativeSaveFileResult {
+interface NativeSaveFileResult {
   canceled: boolean;
   path: string | null;
 }
 
-export interface DesktopSavedFileResult {
+export interface SavedFileResult {
   fileName: string;
   canceled: boolean;
   mode: "native-dialog" | "browser-download";
   path: string | null;
 }
 
-type DesktopBackupCommand = "list_desktop_backups" | "save_desktop_backup" | "read_desktop_backup" | "delete_desktop_backup" | "save_desktop_text_file";
+type BackupCommand = "list_backups" | "save_backup" | "read_backup" | "delete_backup" | "save_text_file";
 
 const BACKUP_STORAGE_KEY = "animetrack.backups";
 const MAX_BACKUP_RECORDS = 12;
 
 function readStoredBackups() {
   if (typeof window === "undefined") {
-    return [] as StoredDesktopBackupFile[];
+    return [] as StoredBackupFile[];
   }
 
   const rawValue = window.localStorage.getItem(BACKUP_STORAGE_KEY);
   if (!rawValue) {
-    return [] as StoredDesktopBackupFile[];
+    return [] as StoredBackupFile[];
   }
 
   try {
-    const parsedValue = JSON.parse(rawValue) as StoredDesktopBackupFile[];
+    const parsedValue = JSON.parse(rawValue) as StoredBackupFile[];
     return Array.isArray(parsedValue) ? parsedValue : [];
   } catch {
-    return [] as StoredDesktopBackupFile[];
+    return [] as StoredBackupFile[];
   }
 }
 
-function persistStoredBackups(backups: StoredDesktopBackupFile[]) {
+function persistStoredBackups(backups: StoredBackupFile[]) {
   if (typeof window === "undefined") {
     return;
   }
@@ -128,7 +128,7 @@ function escapeCsvValue(value: unknown): string {
   return stringValue;
 }
 
-function mapStoredStatus(status: DesktopAnimeStorageEntry["status"]): AnimeStatus {
+function mapStoredStatus(status: AnimeStorageEntry["status"]): AnimeStatus {
   if (status === "planned") {
     return "plan_to_watch";
   }
@@ -140,7 +140,7 @@ function mapStoredStatus(status: DesktopAnimeStorageEntry["status"]): AnimeStatu
   return status;
 }
 
-function buildExportAnimeRecords(entries: DesktopAnimeStorageEntry[]) {
+function buildExportAnimeRecords(entries: AnimeStorageEntry[]) {
   return entries.map((entry) => ({
     id: entry.id,
     title: entry.title,
@@ -177,7 +177,7 @@ function buildExportHistoryRecords(history: WatchHistoryEntry[]) {
   }));
 }
 
-function buildCsvContent(entries: DesktopAnimeStorageEntry[], history: WatchHistoryEntry[]) {
+function buildCsvContent(entries: AnimeStorageEntry[], history: WatchHistoryEntry[]) {
   const lines: string[] = [];
   const animeHeaders = ["ID", "标题", "原标题", "状态", "评分", "进度", "总集数", "时长(分钟)", "首播日期", "开始日期", "结束日期", "标签", "备注"];
   lines.push(animeHeaders.map(escapeCsvValue).join(","));
@@ -260,7 +260,7 @@ function parseImportedData(rawText: string) {
   throw new Error("仅支持桌面快照或 JSON 导出文件");
 }
 
-function parseBackupPayload(rawText: string): DesktopBackupPayload {
+function parseBackupPayload(rawText: string): BackupPayload {
   let parsedValue: unknown;
 
   try {
@@ -273,7 +273,7 @@ function parseBackupPayload(rawText: string): DesktopBackupPayload {
     throw new Error("备份文件格式无效");
   }
 
-  const record = parsedValue as Partial<DesktopBackupPayload>;
+  const record = parsedValue as Partial<BackupPayload>;
   if (!Array.isArray(record.entries) || !Array.isArray(record.history)) {
     throw new Error("备份文件格式无效");
   }
@@ -287,7 +287,7 @@ function parseBackupPayload(rawText: string): DesktopBackupPayload {
   };
 }
 
-function normalizeNativeSaveFileResult(value: unknown): DesktopNativeSaveFileResult {
+function normalizeNativeSaveFileResult(value: unknown): NativeSaveFileResult {
   const record = isRecord(value) ? value : {};
 
   return {
@@ -296,7 +296,7 @@ function normalizeNativeSaveFileResult(value: unknown): DesktopNativeSaveFileRes
   };
 }
 
-function triggerBrowserDownload(file: DesktopTextFileDescriptor) {
+function triggerBrowserDownload(file: TextFileDescriptor) {
   if (typeof window === "undefined") {
     throw new Error("当前环境无法触发浏览器下载");
   }
@@ -309,8 +309,8 @@ function triggerBrowserDownload(file: DesktopTextFileDescriptor) {
   URL.revokeObjectURL(url);
 }
 
-async function saveDesktopTextFile(file: DesktopTextFileDescriptor): Promise<DesktopSavedFileResult> {
-  const runtimeInfo = await readDesktopRuntimeInfo();
+async function saveTextFile(file: TextFileDescriptor): Promise<SavedFileResult> {
+  const runtimeInfo = await readRuntimeInfo();
   if (!runtimeInfo) {
     triggerBrowserDownload(file);
     return {
@@ -321,7 +321,7 @@ async function saveDesktopTextFile(file: DesktopTextFileDescriptor): Promise<Des
     };
   }
 
-  const result = await invokeDesktopBackupCommand<DesktopNativeSaveFileResult>("save_desktop_text_file", {
+  const result = await invokeBackupCommand<NativeSaveFileResult>("save_text_file", {
     request: {
       suggestedName: file.fileName,
       content: file.content,
@@ -342,8 +342,8 @@ async function saveDesktopTextFile(file: DesktopTextFileDescriptor): Promise<Des
   };
 }
 
-function buildDesktopBackupPayload(): DesktopBackupPayload {
-  const snapshot = getDesktopAnimeStorageSnapshot();
+function buildBackupPayload(): BackupPayload {
+  const snapshot = getAnimeStorageSnapshot();
   return {
     schemaVersion: 1,
     source: "animetrack",
@@ -353,7 +353,7 @@ function buildDesktopBackupPayload(): DesktopBackupPayload {
   };
 }
 
-async function invokeDesktopBackupCommand<T>(command: DesktopBackupCommand, args?: Record<string, unknown>) {
+async function invokeBackupCommand<T>(command: BackupCommand, args?: Record<string, unknown>) {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     return {
@@ -376,7 +376,7 @@ async function migrateStoredBackupsToTauri() {
   try {
     for (const backup of localBackups) {
       const payload = parseBackupPayload(backup.content);
-      const result = await invokeDesktopBackupCommand<DesktopBackupFile>("save_desktop_backup", { payload });
+      const result = await invokeBackupCommand<BackupFile>("save_backup", { payload });
       if (!result.ok) {
         return null;
       }
@@ -386,12 +386,12 @@ async function migrateStoredBackupsToTauri() {
   }
 
   clearStoredBackups();
-  const refreshed = await invokeDesktopBackupCommand<DesktopBackupFile[]>("list_desktop_backups");
+  const refreshed = await invokeBackupCommand<BackupFile[]>("list_backups");
   return refreshed.ok ? refreshed.value : null;
 }
 
-export async function listDesktopBackups(): Promise<DesktopBackupFile[]> {
-  const tauriBackups = await invokeDesktopBackupCommand<DesktopBackupFile[]>("list_desktop_backups");
+export async function listBackups(): Promise<BackupFile[]> {
+  const tauriBackups = await invokeBackupCommand<BackupFile[]>("list_backups");
   if (tauriBackups.ok) {
     const localBackups = readStoredBackups();
     if (localBackups.length > 0) {
@@ -407,15 +407,15 @@ export async function listDesktopBackups(): Promise<DesktopBackupFile[]> {
   return readStoredBackups().map(({ content: _content, ...backup }) => backup);
 }
 
-export async function createDesktopBackup() {
-  const payload = buildDesktopBackupPayload();
-  const tauriBackup = await invokeDesktopBackupCommand<DesktopBackupFile>("save_desktop_backup", { payload });
+export async function createBackup() {
+  const payload = buildBackupPayload();
+  const tauriBackup = await invokeBackupCommand<BackupFile>("save_backup", { payload });
   if (tauriBackup.ok) {
     return tauriBackup.value;
   }
 
   const content = JSON.stringify(payload, null, 2);
-  const backup: StoredDesktopBackupFile = {
+  const backup: StoredBackupFile = {
     name: createBackupName(payload.createdAt),
     createdAt: payload.createdAt,
     size: new Blob([content]).size,
@@ -432,8 +432,8 @@ export async function createDesktopBackup() {
   };
 }
 
-export async function deleteDesktopBackup(name: string) {
-  const deleted = await invokeDesktopBackupCommand<void>("delete_desktop_backup", { name });
+export async function deleteBackup(name: string) {
+  const deleted = await invokeBackupCommand<void>("delete_backup", { name });
   if (deleted.ok) {
     return;
   }
@@ -441,11 +441,11 @@ export async function deleteDesktopBackup(name: string) {
   persistStoredBackups(readStoredBackups().filter((backup) => backup.name !== name));
 }
 
-export async function downloadDesktopBackup(name: string) {
-  const backupFromTauri = await invokeDesktopBackupCommand<DesktopBackupPayload>("read_desktop_backup", { name });
+export async function downloadBackup(name: string) {
+  const backupFromTauri = await invokeBackupCommand<BackupPayload>("read_backup", { name });
   if (backupFromTauri.ok) {
     const content = JSON.stringify(backupFromTauri.value, null, 2);
-    return saveDesktopTextFile({
+    return saveTextFile({
       fileName: createBackupName(backupFromTauri.value.createdAt),
       content,
       mimeType: "application/json;charset=utf-8",
@@ -459,7 +459,7 @@ export async function downloadDesktopBackup(name: string) {
     throw new Error("未找到对应备份");
   }
 
-  return saveDesktopTextFile({
+  return saveTextFile({
     fileName: backup.name,
     content: backup.content,
     mimeType: "application/json;charset=utf-8",
@@ -467,10 +467,10 @@ export async function downloadDesktopBackup(name: string) {
   });
 }
 
-export async function restoreDesktopBackup(name: string) {
-  const backupFromTauri = await invokeDesktopBackupCommand<DesktopBackupPayload>("read_desktop_backup", { name });
+export async function restoreBackup(name: string) {
+  const backupFromTauri = await invokeBackupCommand<BackupPayload>("read_backup", { name });
   if (backupFromTauri.ok) {
-    const result = await replaceDesktopAnimeStorageSnapshot({
+    const result = await replaceAnimeStorageSnapshot({
       entries: backupFromTauri.value.entries,
       history: backupFromTauri.value.history,
     });
@@ -488,7 +488,7 @@ export async function restoreDesktopBackup(name: string) {
   }
 
   const parsed = parseImportedData(backup.content);
-  const result = await replaceDesktopAnimeStorageSnapshot(parsed);
+  const result = await replaceAnimeStorageSnapshot(parsed);
 
   return {
     ...result,
@@ -496,9 +496,9 @@ export async function restoreDesktopBackup(name: string) {
   };
 }
 
-export async function restoreDesktopDataFromText(rawText: string) {
+export async function restoreDataFromText(rawText: string) {
   const parsed = parseImportedData(rawText);
-  const result = await replaceDesktopAnimeStorageSnapshot(parsed);
+  const result = await replaceAnimeStorageSnapshot(parsed);
 
   return {
     ...result,
@@ -506,12 +506,19 @@ export async function restoreDesktopDataFromText(rawText: string) {
   };
 }
 
-export async function exportDesktopData(format: "json" | "csv") {
-  const snapshot = getDesktopAnimeStorageSnapshot();
+export async function clearData() {
+  return replaceAnimeStorageSnapshot({
+    entries: [],
+    history: [],
+  });
+}
+
+export async function exportData(format: "json" | "csv") {
+  const snapshot = getAnimeStorageSnapshot();
 
   if (format === "csv") {
     const content = buildCsvContent(snapshot.entries, snapshot.history);
-    return saveDesktopTextFile({
+    return saveTextFile({
       fileName: "anime-track-export.csv",
       content,
       mimeType: "text/csv;charset=utf-8",
@@ -531,7 +538,7 @@ export async function exportDesktopData(format: "json" | "csv") {
     },
   }, null, 2);
 
-  return saveDesktopTextFile({
+  return saveTextFile({
     fileName: "anime-track-export.json",
     content,
     mimeType: "application/json;charset=utf-8",

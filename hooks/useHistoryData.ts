@@ -4,8 +4,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { WatchHistoryRecord, ParsedWatchHistory } from '@/lib/dashboard-types';
 import { readSessionCache, writeSessionCache } from '@/lib/hooks-shared';
-import { DESKTOP_DASHBOARD_CACHE_KEYS } from '@/src/lib/desktop-dashboard-shared';
-import { loadDesktopWatchHistoryRecords } from '@/src/lib/desktop-anime-store';
+import { DASHBOARD_CACHE_KEYS } from '@/lib/dashboard-shared';
+import { loadWatchHistoryRecords } from '@/src/lib/anime-store';
 
 export function useHistoryData() {
     const [watchHistory, setWatchHistory] = useState<WatchHistoryRecord[]>([]);
@@ -27,7 +27,7 @@ export function useHistoryData() {
     }, [watchHistory]);
 
     useEffect(() => {
-        const cached = readSessionCache<WatchHistoryRecord[]>(DESKTOP_DASHBOARD_CACHE_KEYS.dashboardHistory);
+        const cached = readSessionCache<WatchHistoryRecord[]>(DASHBOARD_CACHE_KEYS.dashboardHistory);
         if (cached) {
             setWatchHistory(cached);
             setIsLoading(false);
@@ -36,9 +36,9 @@ export function useHistoryData() {
 
         setIsRefreshing(true);
         try {
-            const entries = loadDesktopWatchHistoryRecords();
+            const entries = loadWatchHistoryRecords();
             setWatchHistory(entries);
-            writeSessionCache(DESKTOP_DASHBOARD_CACHE_KEYS.dashboardHistory, entries);
+            writeSessionCache(DASHBOARD_CACHE_KEYS.dashboardHistory, entries);
         } catch (err) {
             console.error('Failed to load desktop history data', err);
         } finally {

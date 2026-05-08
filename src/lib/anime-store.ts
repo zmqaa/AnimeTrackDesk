@@ -1,13 +1,13 @@
 import type { AnimeRecord, WatchHistoryRecord } from "@/lib/dashboard-types";
-import { getLocalTodayDateString } from "@/src/lib/local-date-time";
+import { getLocalTodayDateString } from "@/lib/local-date-time";
 import { writeSessionCache } from "@/lib/hooks-shared";
 import type { AnimeDetailItem, AnimeListItem, AnimeStatus } from "@/lib/anime-shared";
-import { DESKTOP_DASHBOARD_CACHE_KEYS } from "@/src/lib/desktop-dashboard-shared";
+import { DASHBOARD_CACHE_KEYS } from "@/lib/dashboard-shared";
 import { uniqueStrings } from "@/lib/anime-cast";
-import { seedAnimeEntries, seedHistory } from "../data/mock";
+import initialAnimeExport from "@/src/data/initial-anime-export.json";
 import type { AnimeEntry, WatchHistoryEntry } from "../types";
 
-export interface DesktopAnimeStorageEntry extends AnimeEntry {
+export interface AnimeStorageEntry extends AnimeEntry {
   createdAt?: string;
   originalTitle?: string;
   notes?: string;
@@ -22,12 +22,12 @@ export interface DesktopAnimeStorageEntry extends AnimeEntry {
   lastWatchedAt?: string;
 }
 
-export interface DesktopAnimeStorageSnapshot {
-  entries: DesktopAnimeStorageEntry[];
+export interface AnimeStorageSnapshot {
+  entries: AnimeStorageEntry[];
   history: WatchHistoryEntry[];
 }
 
-export interface DesktopAdminAnimeRecord {
+export interface AdminAnimeRecord {
   id: number;
   title: string;
   original_title: string | null;
@@ -38,7 +38,7 @@ export interface DesktopAdminAnimeRecord {
   createdAt: string;
 }
 
-export interface DesktopAdminHistoryRecord {
+export interface AdminHistoryRecord {
   id: number;
   animeId: number;
   animeTitle: string;
@@ -46,13 +46,13 @@ export interface DesktopAdminHistoryRecord {
   watchedAt: string;
 }
 
-export interface DesktopAdminQueryOptions {
+export interface AdminQueryOptions {
   page: number;
   pageSize: number;
   search?: string;
 }
 
-export interface DesktopAnimeUpsertInput {
+export interface AnimeUpsertInput {
   title: string;
   originalTitle?: string;
   progress: number;
@@ -68,7 +68,7 @@ export interface DesktopAnimeUpsertInput {
   isFinished: boolean;
 }
 
-export interface DesktopAnimeDetailPatchInput {
+export interface AnimeDetailPatchInput {
   title?: string;
   originalTitle?: string | null;
   status?: AnimeStatus;
@@ -87,7 +87,7 @@ export interface DesktopAnimeDetailPatchInput {
   isFinished?: boolean;
 }
 
-export interface DesktopAnimeProgressRecordInput {
+export interface AnimeProgressRecordInput {
   id: number;
   requestedProgress: number;
   totalEpisodes?: number | null;
@@ -96,23 +96,26 @@ export interface DesktopAnimeProgressRecordInput {
   forceHistory?: boolean;
 }
 
-interface StoredAnimeEntry extends DesktopAnimeStorageEntry {}
+interface StoredAnimeEntry extends AnimeStorageEntry {}
 
 const ENTRY_STORAGE_KEY = "animetrack.entries";
 const HISTORY_STORAGE_KEY = "animetrack.history";
-const ANIME_LIST_CACHE_KEY = DESKTOP_DASHBOARD_CACHE_KEYS.animeList;
-const DASHBOARD_ANIME_CACHE_KEY = DESKTOP_DASHBOARD_CACHE_KEYS.dashboardAnime;
-const DASHBOARD_HISTORY_CACHE_KEY = DESKTOP_DASHBOARD_CACHE_KEYS.dashboardHistory;
+const BOOTSTRAP_STORAGE_KEY = "animetrack.bootstrap.complete";
+const LEGACY_SEED_ENTRY_IDS = new Set(["frieren", "apothecary-diaries-s2", "witch-hat-atelier", "pluto"]);
+const LEGACY_SEED_HISTORY_IDS = new Set(["h1", "h2", "h3"]);
+const ANIME_LIST_CACHE_KEY = DASHBOARD_CACHE_KEYS.animeList;
+const DASHBOARD_ANIME_CACHE_KEY = DASHBOARD_CACHE_KEYS.dashboardAnime;
+const DASHBOARD_HISTORY_CACHE_KEY = DASHBOARD_CACHE_KEYS.dashboardHistory;
 
-type DesktopAnimeCommand =
-  | "load_desktop_anime_snapshot"
-  | "save_desktop_anime_snapshot"
-  | "upsert_desktop_anime_entry"
-  | "save_desktop_watch_history_entry"
-  | "delete_desktop_anime_entries"
-  | "delete_desktop_watch_history_entries";
+type AnimeCommand =
+  | "load_anime_snapshot"
+  | "save_anime_snapshot"
+  | "upsert_anime_entry"
+  | "save_watch_history_entry"
+  | "delete_anime_entries"
+  | "delete_watch_history_entries";
 
-interface DesktopAnimeMutationInput {
+interface AnimeMutationInput {
   upsertEntries?: StoredAnimeEntry[];
   saveHistory?: WatchHistoryEntry[];
   deleteAnimeIds?: string[];
@@ -120,8 +123,17 @@ interface DesktopAnimeMutationInput {
   replaceAll?: boolean;
 }
 
-let desktopAnimeHydrationPromise: Promise<DesktopAnimeStorageSnapshot> | null = null;
-let desktopAnimePersistenceQueue: Promise<void> = Promise.resolve();
+interface BundledAnimeExportShape {
+  anime?: {
+    records?: unknown[];
+  };
+  watchHistory?: {
+    records?: unknown[];
+  };
+}
+
+let animeHydrationPromise: Promise<AnimeStorageSnapshot> | null = null;
+let animePersistenceQueue: Promise<void> = Promise.resolve();
 
 function hashId(value: string) {
   let hash = 0;
@@ -158,6 +170,18 @@ function hasStoredValue(storageKey: string) {
   }
 
   return window.localStorage.getItem(storageKey) !== null;
+}
+
+function hasCompletedBootstrap() {
+  return hasStoredValue(BOOTSTRAP_STORAGE_KEY);
+}
+
+function markBootstrapComplete() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(BOOTSTRAP_STORAGE_KEY, "1");
 }
 
 function mapStoredStatus(status: AnimeEntry["status"]): AnimeStatus {
@@ -468,13 +492,13 @@ function cloneHistoryRecord(record: WatchHistoryEntry): WatchHistoryEntry {
   return { ...record };
 }
 
-function isDesktopAnimeSnapshotShape(value: unknown): value is { entries: unknown[]; history: unknown[] } {
+function isAnimeSnapshotShape(value: unknown): value is { entries: unknown[]; history: unknown[] } {
   return typeof value === "object" && value !== null
     && Array.isArray((value as { entries?: unknown[] }).entries)
     && Array.isArray((value as { history?: unknown[] }).history);
 }
 
-function normalizeDesktopAnimeSnapshot(snapshot: { entries: unknown[]; history: unknown[] }): DesktopAnimeStorageSnapshot {
+function normalizeAnimeSnapshot(snapshot: { entries: unknown[]; history: unknown[] }): AnimeStorageSnapshot {
   const fallbackTimestamp = new Date().toISOString();
 
   return {
@@ -487,21 +511,121 @@ function normalizeDesktopAnimeSnapshot(snapshot: { entries: unknown[]; history: 
   };
 }
 
-function readLocalDesktopSnapshot() {
-  return normalizeDesktopAnimeSnapshot({
-    entries: readStoredArray<StoredAnimeEntry>(ENTRY_STORAGE_KEY, seedAnimeEntries as StoredAnimeEntry[]),
-    history: readStoredArray<WatchHistoryEntry>(HISTORY_STORAGE_KEY, seedHistory),
+function normalizeImportedSnapshotData(snapshot: { entries: unknown[]; history: unknown[] }): AnimeStorageSnapshot {
+  const fallbackTimestamp = new Date().toISOString();
+  const usedEntryIds = new Set<string>();
+  const animeIdBySource = new Map<string, string>();
+  const animeIdByTitle = new Map<string, string>();
+  const animeTitleById = new Map<string, string>();
+  const nextEntries: StoredAnimeEntry[] = [];
+
+  for (const record of snapshot.entries) {
+    const normalizedEntry = normalizeImportedEntry(record, fallbackTimestamp, usedEntryIds);
+    if (!normalizedEntry) {
+      continue;
+    }
+
+    nextEntries.push(normalizedEntry.entry);
+    animeIdByTitle.set(normalizedEntry.entry.title, normalizedEntry.entry.id);
+    animeTitleById.set(normalizedEntry.entry.id, normalizedEntry.entry.title);
+
+    if (normalizedEntry.sourceId) {
+      animeIdBySource.set(normalizedEntry.sourceId, normalizedEntry.entry.id);
+    }
+  }
+
+  const usedHistoryIds = new Set<string>();
+  const nextHistory: WatchHistoryEntry[] = [];
+
+  for (const record of snapshot.history) {
+    const normalizedHistory = normalizeImportedHistoryRecord(
+      record,
+      fallbackTimestamp,
+      usedHistoryIds,
+      animeIdBySource,
+      animeIdByTitle,
+      animeTitleById,
+    );
+
+    if (normalizedHistory) {
+      nextHistory.push(normalizedHistory);
+    }
+  }
+
+  return {
+    entries: nextEntries,
+    history: nextHistory,
+  };
+}
+
+function getBundledInitialSnapshot() {
+  const bundledExport = initialAnimeExport as BundledAnimeExportShape;
+
+  return normalizeImportedSnapshotData({
+    entries: Array.isArray(bundledExport.anime?.records) ? bundledExport.anime.records : [],
+    history: Array.isArray(bundledExport.watchHistory?.records) ? bundledExport.watchHistory.records : [],
   });
 }
 
-function persistDesktopStateLocally(entries: StoredAnimeEntry[], history: WatchHistoryEntry[]) {
+function repairMissingEpisodeCounts(snapshot: AnimeStorageSnapshot) {
+  const bundledSnapshot = getBundledInitialSnapshot();
+  const bundledEntryByKey = new Map<string, StoredAnimeEntry>();
+
+  for (const entry of bundledSnapshot.entries) {
+    bundledEntryByKey.set(`id:${entry.id}`, entry);
+    bundledEntryByKey.set(`title:${entry.title}`, entry);
+
+    if (entry.originalTitle) {
+      bundledEntryByKey.set(`original:${entry.originalTitle}`, entry);
+    }
+  }
+
+  let repairedCount = 0;
+  const repairedEntries = snapshot.entries.map((entry) => {
+    if (entry.episodes > 0) {
+      return entry;
+    }
+
+    const bundledEntry = bundledEntryByKey.get(`id:${entry.id}`)
+      || bundledEntryByKey.get(`title:${entry.title}`)
+      || (entry.originalTitle ? bundledEntryByKey.get(`original:${entry.originalTitle}`) : undefined);
+
+    if (!bundledEntry || bundledEntry.episodes <= 0) {
+      return entry;
+    }
+
+    repairedCount += 1;
+    return normalizeStoredEntry({
+      ...entry,
+      episodes: bundledEntry.episodes,
+    });
+  });
+
+  return {
+    snapshot: {
+      entries: repairedEntries,
+      history: snapshot.history,
+    },
+    repairedCount,
+  };
+}
+
+function readLocalAnimeSnapshot() {
+  return normalizeAnimeSnapshot({
+    entries: readStoredArray<StoredAnimeEntry>(ENTRY_STORAGE_KEY, []),
+    history: readStoredArray<WatchHistoryEntry>(HISTORY_STORAGE_KEY, []),
+  });
+}
+
+function persistAnimeStateLocally(entries: StoredAnimeEntry[], history: WatchHistoryEntry[]) {
   if (typeof window === "undefined") {
     return;
   }
 
-  const snapshot = normalizeDesktopAnimeSnapshot({ entries, history });
+  const snapshot = normalizeAnimeSnapshot({ entries, history });
   window.localStorage.setItem(ENTRY_STORAGE_KEY, JSON.stringify(snapshot.entries));
   window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(snapshot.history));
+  markBootstrapComplete();
 
   const listItems = snapshot.entries.map(buildAnimeListItem);
   writeSessionCache(ANIME_LIST_CACHE_KEY, listItems);
@@ -509,7 +633,7 @@ function persistDesktopStateLocally(entries: StoredAnimeEntry[], history: WatchH
   writeSessionCache(DASHBOARD_HISTORY_CACHE_KEY, buildDashboardHistoryRecords(snapshot.entries, snapshot.history));
 }
 
-async function invokeDesktopAnimeCommand<T>(command: DesktopAnimeCommand, args?: Record<string, unknown>) {
+async function invokeAnimeCommand<T>(command: AnimeCommand, args?: Record<string, unknown>) {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     return await invoke<T>(command, args);
@@ -518,29 +642,42 @@ async function invokeDesktopAnimeCommand<T>(command: DesktopAnimeCommand, args?:
   }
 }
 
-async function loadDesktopAnimeSnapshotFromTauri() {
-  const response = await invokeDesktopAnimeCommand<DesktopAnimeStorageSnapshot>("load_desktop_anime_snapshot");
-  return response && isDesktopAnimeSnapshotShape(response)
-    ? normalizeDesktopAnimeSnapshot(response)
+async function loadAnimeSnapshotFromTauri() {
+  const response = await invokeAnimeCommand<AnimeStorageSnapshot>("load_anime_snapshot");
+  return response && isAnimeSnapshotShape(response)
+    ? normalizeAnimeSnapshot(response)
     : null;
 }
 
-async function saveDesktopAnimeSnapshotToTauri(snapshot: DesktopAnimeStorageSnapshot) {
-  const response = await invokeDesktopAnimeCommand<DesktopAnimeStorageSnapshot>("save_desktop_anime_snapshot", {
+async function saveAnimeSnapshotToTauri(snapshot: AnimeStorageSnapshot) {
+  const response = await invokeAnimeCommand<AnimeStorageSnapshot>("save_anime_snapshot", {
     snapshot,
   });
 
-  return response && isDesktopAnimeSnapshotShape(response)
-    ? normalizeDesktopAnimeSnapshot(response)
+  return response && isAnimeSnapshotShape(response)
+    ? normalizeAnimeSnapshot(response)
     : null;
 }
 
-function hasPersistedLocalDesktopSnapshot() {
+function hasPersistedLocalAnimeSnapshot() {
   return hasStoredValue(ENTRY_STORAGE_KEY) || hasStoredValue(HISTORY_STORAGE_KEY);
 }
 
-function isDesktopAnimeSnapshotEmpty(snapshot: DesktopAnimeStorageSnapshot) {
+function isAnimeSnapshotEmpty(snapshot: AnimeStorageSnapshot) {
   return snapshot.entries.length === 0 && snapshot.history.length === 0;
+}
+
+function shouldBootstrapBundledSnapshot(snapshot: AnimeStorageSnapshot) {
+  return !hasCompletedBootstrap()
+    && !hasPersistedLocalAnimeSnapshot()
+    && isAnimeSnapshotEmpty(snapshot);
+}
+
+function isLegacyMockSnapshot(snapshot: AnimeStorageSnapshot) {
+  return snapshot.entries.length === LEGACY_SEED_ENTRY_IDS.size
+    && snapshot.history.length === LEGACY_SEED_HISTORY_IDS.size
+    && snapshot.entries.every((entry) => LEGACY_SEED_ENTRY_IDS.has(entry.id))
+    && snapshot.history.every((record) => LEGACY_SEED_HISTORY_IDS.has(record.id));
 }
 
 function buildAnimeListItem(entry: StoredAnimeEntry): AnimeListItem {
@@ -663,7 +800,7 @@ function matchesAdminHistorySearch(record: WatchHistoryEntry, query: string) {
   return candidates.some((candidate) => candidate?.toLowerCase().includes(query));
 }
 
-function buildDesktopAdminAnimeRecord(entry: StoredAnimeEntry): DesktopAdminAnimeRecord {
+function buildAdminAnimeRecord(entry: StoredAnimeEntry): AdminAnimeRecord {
   return {
     id: hashId(entry.id),
     title: entry.title,
@@ -676,7 +813,7 @@ function buildDesktopAdminAnimeRecord(entry: StoredAnimeEntry): DesktopAdminAnim
   };
 }
 
-function buildDesktopAdminHistoryRecord(record: WatchHistoryEntry, animeIdMap: Map<string, number>): DesktopAdminHistoryRecord {
+function buildAdminHistoryRecord(record: WatchHistoryEntry, animeIdMap: Map<string, number>): AdminHistoryRecord {
   return {
     id: hashId(record.id),
     animeId: animeIdMap.get(record.animeId) ?? hashId(record.animeId),
@@ -686,78 +823,78 @@ function buildDesktopAdminHistoryRecord(record: WatchHistoryEntry, animeIdMap: M
   };
 }
 
-function loadDesktopState() {
-  return readLocalDesktopSnapshot();
+function loadAnimeState() {
+  return readLocalAnimeSnapshot();
 }
 
-function enqueueDesktopAnimePersistence(task: () => Promise<void>) {
-  const nextTask = desktopAnimePersistenceQueue
+function enqueueAnimePersistence(task: () => Promise<void>) {
+  const nextTask = animePersistenceQueue
     .catch(() => undefined)
     .then(task);
 
-  desktopAnimePersistenceQueue = nextTask.catch(() => undefined);
+  animePersistenceQueue = nextTask.catch(() => undefined);
   return nextTask;
 }
 
-function persistDesktopMutation(input: DesktopAnimeMutationInput) {
+function persistAnimeMutation(input: AnimeMutationInput) {
   const upsertEntries = input.upsertEntries ?? [];
   const saveHistory = input.saveHistory ?? [];
   const deleteHistoryIds = Array.from(new Set((input.deleteHistoryIds ?? []).filter(Boolean)));
   const deleteAnimeIds = Array.from(new Set((input.deleteAnimeIds ?? []).filter(Boolean)));
 
-  return enqueueDesktopAnimePersistence(async () => {
+  return enqueueAnimePersistence(async () => {
     if (input.replaceAll) {
       if (deleteHistoryIds.length > 0) {
-        await invokeDesktopAnimeCommand<number>("delete_desktop_watch_history_entries", { ids: deleteHistoryIds });
+        await invokeAnimeCommand<number>("delete_watch_history_entries", { ids: deleteHistoryIds });
       }
 
       if (deleteAnimeIds.length > 0) {
-        await invokeDesktopAnimeCommand<number>("delete_desktop_anime_entries", { ids: deleteAnimeIds });
+        await invokeAnimeCommand<number>("delete_anime_entries", { ids: deleteAnimeIds });
       }
     }
 
     for (const entry of upsertEntries) {
-      await invokeDesktopAnimeCommand<StoredAnimeEntry>("upsert_desktop_anime_entry", { entry });
+      await invokeAnimeCommand<StoredAnimeEntry>("upsert_anime_entry", { entry });
     }
 
     for (const record of saveHistory) {
-      await invokeDesktopAnimeCommand<WatchHistoryEntry>("save_desktop_watch_history_entry", { record });
+      await invokeAnimeCommand<WatchHistoryEntry>("save_watch_history_entry", { record });
     }
 
     if (!input.replaceAll) {
       if (deleteHistoryIds.length > 0) {
-        await invokeDesktopAnimeCommand<number>("delete_desktop_watch_history_entries", { ids: deleteHistoryIds });
+        await invokeAnimeCommand<number>("delete_watch_history_entries", { ids: deleteHistoryIds });
       }
 
       if (deleteAnimeIds.length > 0) {
-        await invokeDesktopAnimeCommand<number>("delete_desktop_anime_entries", { ids: deleteAnimeIds });
+        await invokeAnimeCommand<number>("delete_anime_entries", { ids: deleteAnimeIds });
       }
     }
   });
 }
 
-function persistDesktopMutationState(
+function persistAnimeMutationState(
   entries: StoredAnimeEntry[],
   history: WatchHistoryEntry[],
-  input: DesktopAnimeMutationInput,
+  input: AnimeMutationInput,
 ) {
-  persistDesktopStateLocally(entries, history);
-  return persistDesktopMutation(input);
+  persistAnimeStateLocally(entries, history);
+  return persistAnimeMutation(input);
 }
 
-function persistDesktopState(entries: StoredAnimeEntry[], history: WatchHistoryEntry[]) {
-  const snapshot = normalizeDesktopAnimeSnapshot({ entries, history });
-  persistDesktopStateLocally(snapshot.entries, snapshot.history);
-  enqueueDesktopAnimePersistence(async () => {
-    await saveDesktopAnimeSnapshotToTauri(snapshot);
+function persistAnimeState(entries: StoredAnimeEntry[], history: WatchHistoryEntry[]) {
+  const snapshot = normalizeAnimeSnapshot({ entries, history });
+  persistAnimeStateLocally(snapshot.entries, snapshot.history);
+  enqueueAnimePersistence(async () => {
+    await saveAnimeSnapshotToTauri(snapshot);
   });
 }
 
-async function replaceDesktopSnapshotState(
-  nextSnapshot: DesktopAnimeStorageSnapshot,
-  currentSnapshot: DesktopAnimeStorageSnapshot,
+async function replaceSnapshotState(
+  nextSnapshot: AnimeStorageSnapshot,
+  currentSnapshot: AnimeStorageSnapshot,
 ) {
-  await persistDesktopMutationState(nextSnapshot.entries, nextSnapshot.history, {
+  await persistAnimeMutationState(nextSnapshot.entries, nextSnapshot.history, {
     replaceAll: true,
     upsertEntries: nextSnapshot.entries,
     saveHistory: nextSnapshot.history,
@@ -768,38 +905,44 @@ async function replaceDesktopSnapshotState(
   return nextSnapshot;
 }
 
-export function getCachedDesktopAnimeStorageSnapshot() {
-  return normalizeDesktopAnimeSnapshot(readLocalDesktopSnapshot());
+export function getCachedAnimeStorageSnapshot() {
+  return normalizeAnimeSnapshot(readLocalAnimeSnapshot());
 }
 
-export async function hydrateDesktopAnimeStore() {
-  if (desktopAnimeHydrationPromise) {
-    return desktopAnimeHydrationPromise;
+export async function hydrateAnimeStore() {
+  if (animeHydrationPromise) {
+    return animeHydrationPromise;
   }
 
-  desktopAnimeHydrationPromise = (async () => {
-    const cachedSnapshot = getCachedDesktopAnimeStorageSnapshot();
-    const tauriSnapshot = await loadDesktopAnimeSnapshotFromTauri();
+  animeHydrationPromise = (async () => {
+    const cachedSnapshot = getCachedAnimeStorageSnapshot();
+    const tauriSnapshot = await loadAnimeSnapshotFromTauri();
 
     if (!tauriSnapshot) {
-      persistDesktopStateLocally(cachedSnapshot.entries, cachedSnapshot.history);
-      return cachedSnapshot;
+      const nextSnapshot = shouldBootstrapBundledSnapshot(cachedSnapshot) || isLegacyMockSnapshot(cachedSnapshot)
+        ? getBundledInitialSnapshot()
+        : cachedSnapshot;
+      const repairedSnapshot = repairMissingEpisodeCounts(nextSnapshot);
+      persistAnimeStateLocally(repairedSnapshot.snapshot.entries, repairedSnapshot.snapshot.history);
+      return repairedSnapshot.snapshot;
     }
 
-    if (isDesktopAnimeSnapshotEmpty(tauriSnapshot)) {
-      const nextSnapshot = hasPersistedLocalDesktopSnapshot() || !isDesktopAnimeSnapshotEmpty(cachedSnapshot)
-        ? cachedSnapshot
-        : getCachedDesktopAnimeStorageSnapshot();
-      const resolvedSnapshot = await replaceDesktopSnapshotState(nextSnapshot, tauriSnapshot);
-      persistDesktopStateLocally(resolvedSnapshot.entries, resolvedSnapshot.history);
-      return resolvedSnapshot;
+    if (isAnimeSnapshotEmpty(tauriSnapshot)) {
+      const nextSnapshot = shouldBootstrapBundledSnapshot(cachedSnapshot) || isLegacyMockSnapshot(cachedSnapshot)
+        ? getBundledInitialSnapshot()
+        : cachedSnapshot;
+      const resolvedSnapshot = await replaceSnapshotState(nextSnapshot, tauriSnapshot);
+      const repairedSnapshot = repairMissingEpisodeCounts(resolvedSnapshot);
+      persistAnimeStateLocally(repairedSnapshot.snapshot.entries, repairedSnapshot.snapshot.history);
+      return repairedSnapshot.snapshot;
     }
 
-    persistDesktopStateLocally(tauriSnapshot.entries, tauriSnapshot.history);
-    return tauriSnapshot;
+    const repairedSnapshot = repairMissingEpisodeCounts(tauriSnapshot);
+    persistAnimeStateLocally(repairedSnapshot.snapshot.entries, repairedSnapshot.snapshot.history);
+    return repairedSnapshot.snapshot;
   })();
 
-  return desktopAnimeHydrationPromise;
+  return animeHydrationPromise;
 }
 
 function findEntryIndex(entries: StoredAnimeEntry[], id: number) {
@@ -830,16 +973,16 @@ function resolveStatusForProgress(currentStatus: AnimeStatus, progress: number, 
   return currentStatus;
 }
 
-export function loadDesktopAnimeListItems() {
-  return loadDesktopState().entries.map(buildAnimeListItem);
+export function loadAnimeListItems() {
+  return loadAnimeState().entries.map(buildAnimeListItem);
 }
 
-export function loadDesktopDashboardAnimeRecords() {
-  return buildDashboardAnimeRecords(loadDesktopState().entries);
+export function loadDashboardAnimeRecords() {
+  return buildDashboardAnimeRecords(loadAnimeState().entries);
 }
 
-export function loadDesktopAdminAnimeRecords(options: DesktopAdminQueryOptions) {
-  const { entries } = loadDesktopState();
+export function loadAdminAnimeRecords(options: AdminQueryOptions) {
+  const { entries } = loadAnimeState();
   const searchQuery = normalizeSearchQuery(options.search);
   const filteredEntries = entries
     .filter((entry) => matchesAdminAnimeSearch(entry, searchQuery))
@@ -854,12 +997,12 @@ export function loadDesktopAdminAnimeRecords(options: DesktopAdminQueryOptions) 
 
   return {
     total: filteredEntries.length,
-    records: paginateItems(filteredEntries, options.page, options.pageSize).map(buildDesktopAdminAnimeRecord),
+    records: paginateItems(filteredEntries, options.page, options.pageSize).map(buildAdminAnimeRecord),
   };
 }
 
-export function loadDesktopAdminHistoryRecords(options: DesktopAdminQueryOptions) {
-  const { entries, history } = loadDesktopState();
+export function loadAdminHistoryRecords(options: AdminQueryOptions) {
+  const { entries, history } = loadAnimeState();
   const searchQuery = normalizeSearchQuery(options.search);
   const animeIdMap = new Map(entries.map((entry) => [entry.id, hashId(entry.id)]));
   const filteredHistory = history
@@ -868,15 +1011,15 @@ export function loadDesktopAdminHistoryRecords(options: DesktopAdminQueryOptions
 
   return {
     total: filteredHistory.length,
-    records: paginateItems(filteredHistory, options.page, options.pageSize).map((record) => buildDesktopAdminHistoryRecord(record, animeIdMap)),
+    records: paginateItems(filteredHistory, options.page, options.pageSize).map((record) => buildAdminHistoryRecord(record, animeIdMap)),
   };
 }
 
-export function getDesktopAnimeStorageSnapshot(): DesktopAnimeStorageSnapshot {
-  return getCachedDesktopAnimeStorageSnapshot();
+export function getAnimeStorageSnapshot(): AnimeStorageSnapshot {
+  return getCachedAnimeStorageSnapshot();
 }
 
-export async function replaceDesktopAnimeStorageSnapshot(snapshot: {
+export async function replaceAnimeStorageSnapshot(snapshot: {
   entries: unknown[];
   history: unknown[];
 }) {
@@ -884,7 +1027,7 @@ export async function replaceDesktopAnimeStorageSnapshot(snapshot: {
     throw new Error("导入文件格式无效");
   }
 
-  const currentSnapshot = loadDesktopState();
+  const currentSnapshot = loadAnimeState();
   const fallbackTimestamp = new Date().toISOString();
   const usedEntryIds = new Set<string>();
   const animeIdBySource = new Map<string, string>();
@@ -925,7 +1068,7 @@ export async function replaceDesktopAnimeStorageSnapshot(snapshot: {
     }
   }
 
-  await replaceDesktopSnapshotState({ entries: nextEntries, history: nextHistory }, currentSnapshot);
+  await replaceSnapshotState({ entries: nextEntries, history: nextHistory }, currentSnapshot);
 
   return {
     animeCount: nextEntries.length,
@@ -933,21 +1076,21 @@ export async function replaceDesktopAnimeStorageSnapshot(snapshot: {
   };
 }
 
-export function loadDesktopAnimeDetailItem(id: number) {
-  const entry = loadDesktopState().entries.find((item) => hashId(item.id) === id);
+export function loadAnimeDetailItem(id: number) {
+  const entry = loadAnimeState().entries.find((item) => hashId(item.id) === id);
   return entry ? buildAnimeDetailItem(entry) : null;
 }
 
-export function loadDesktopWatchHistoryRecords() {
-  const { entries, history } = loadDesktopState();
+export function loadWatchHistoryRecords() {
+  const { entries, history } = loadAnimeState();
 
   return buildDashboardHistoryRecords(entries, history).sort(
     (left, right) => new Date(right.watchedAt).getTime() - new Date(left.watchedAt).getTime(),
   );
 }
 
-export function upsertDesktopAnimeItem(editingId: number | null, input: DesktopAnimeUpsertInput) {
-  const { entries, history } = loadDesktopState();
+export function upsertAnimeItem(editingId: number | null, input: AnimeUpsertInput) {
+  const { entries, history } = loadAnimeState();
   const now = new Date().toISOString();
   const existingIndex = editingId === null ? -1 : findEntryIndex(entries, editingId);
   const existingEntry = existingIndex >= 0 ? entries[existingIndex] : null;
@@ -992,7 +1135,7 @@ export function upsertDesktopAnimeItem(editingId: number | null, input: DesktopA
     : [nextEntry, ...entries];
   const nextHistory = existingEntry ? syncHistoryAnimeTitle(history, existingEntry.id, nextEntry.title) : history;
 
-  persistDesktopMutationState(nextEntries, nextHistory, {
+  persistAnimeMutationState(nextEntries, nextHistory, {
     upsertEntries: [nextEntry],
   });
 
@@ -1002,8 +1145,8 @@ export function upsertDesktopAnimeItem(editingId: number | null, input: DesktopA
   };
 }
 
-export function updateDesktopAnimeDetailItem(id: number, input: DesktopAnimeDetailPatchInput) {
-  const { entries, history } = loadDesktopState();
+export function updateAnimeDetailItem(id: number, input: AnimeDetailPatchInput) {
+  const { entries, history } = loadAnimeState();
   const entryIndex = findEntryIndex(entries, id);
 
   if (entryIndex < 0) {
@@ -1072,7 +1215,7 @@ export function updateDesktopAnimeDetailItem(id: number, input: DesktopAnimeDeta
     : syncedHistory;
   const createdHistory = nextProgress > existingEntry.progress ? nextHistory[0] : null;
 
-  persistDesktopMutationState(nextEntries, nextHistory, {
+  persistAnimeMutationState(nextEntries, nextHistory, {
     upsertEntries: [nextEntry],
     saveHistory: createdHistory ? [createdHistory] : [],
   });
@@ -1083,16 +1226,16 @@ export function updateDesktopAnimeDetailItem(id: number, input: DesktopAnimeDeta
   };
 }
 
-export function updateDesktopAnimeProgress(id: number, requestedProgress: number, totalEpisodes?: number | null) {
-  return recordDesktopAnimeProgress({
+export function updateAnimeProgress(id: number, requestedProgress: number, totalEpisodes?: number | null) {
+  return recordAnimeProgress({
     id,
     requestedProgress,
     totalEpisodes,
   });
 }
 
-export function recordDesktopAnimeProgress(input: DesktopAnimeProgressRecordInput) {
-  const { entries, history } = loadDesktopState();
+export function recordAnimeProgress(input: AnimeProgressRecordInput) {
+  const { entries, history } = loadAnimeState();
   const entryIndex = findEntryIndex(entries, input.id);
 
   if (entryIndex < 0) {
@@ -1136,7 +1279,7 @@ export function recordDesktopAnimeProgress(input: DesktopAnimeProgressRecordInpu
     : history;
   const createdHistory = shouldWriteHistory ? nextHistory[0] : null;
 
-  persistDesktopMutationState(nextEntries, nextHistory, {
+  persistAnimeMutationState(nextEntries, nextHistory, {
     upsertEntries: [nextEntry],
     saveHistory: createdHistory ? [createdHistory] : [],
   });
@@ -1148,8 +1291,8 @@ export function recordDesktopAnimeProgress(input: DesktopAnimeProgressRecordInpu
   };
 }
 
-export function deleteDesktopAnimeItem(id: number) {
-  const { entries, history } = loadDesktopState();
+export function deleteAnimeItem(id: number) {
+  const { entries, history } = loadAnimeState();
   const entryIndex = findEntryIndex(entries, id);
 
   if (entryIndex < 0) {
@@ -1160,7 +1303,7 @@ export function deleteDesktopAnimeItem(id: number) {
   const nextEntries = entries.filter((_, index) => index !== entryIndex);
   const nextHistory = history.filter((record) => record.animeId !== removedEntry.id);
 
-  persistDesktopMutationState(nextEntries, nextHistory, {
+  persistAnimeMutationState(nextEntries, nextHistory, {
     deleteAnimeIds: [removedEntry.id],
   });
 
@@ -1169,13 +1312,13 @@ export function deleteDesktopAnimeItem(id: number) {
   };
 }
 
-export function deleteDesktopAnimeItems(ids: number[]) {
+export function deleteAnimeItems(ids: number[]) {
   const uniqueIds = Array.from(new Set(ids));
   if (uniqueIds.length === 0) {
     return { deleted: 0 };
   }
 
-  const { entries, history } = loadDesktopState();
+  const { entries, history } = loadAnimeState();
   const idsToDelete = new Set(uniqueIds);
   const removedEntryIds = new Set(
     entries
@@ -1190,7 +1333,7 @@ export function deleteDesktopAnimeItems(ids: number[]) {
   const nextEntries = entries.filter((entry) => !removedEntryIds.has(entry.id));
   const nextHistory = history.filter((record) => !removedEntryIds.has(record.animeId));
 
-  persistDesktopMutationState(nextEntries, nextHistory, {
+  persistAnimeMutationState(nextEntries, nextHistory, {
     deleteAnimeIds: Array.from(removedEntryIds),
   });
 
@@ -1199,13 +1342,13 @@ export function deleteDesktopAnimeItems(ids: number[]) {
   };
 }
 
-export function deleteDesktopWatchHistoryItems(ids: number[]) {
+export function deleteWatchHistoryItems(ids: number[]) {
   const uniqueIds = Array.from(new Set(ids));
   if (uniqueIds.length === 0) {
     return { deleted: 0 };
   }
 
-  const { entries, history } = loadDesktopState();
+  const { entries, history } = loadAnimeState();
   const idsToDelete = new Set(uniqueIds);
   const removedHistoryIds = history
     .filter((record) => idsToDelete.has(hashId(record.id)))
@@ -1218,7 +1361,7 @@ export function deleteDesktopWatchHistoryItems(ids: number[]) {
     throw new Error("未找到对应历史记录");
   }
 
-  persistDesktopMutationState(entries, nextHistory, {
+  persistAnimeMutationState(entries, nextHistory, {
     deleteHistoryIds: removedHistoryIds,
   });
 
