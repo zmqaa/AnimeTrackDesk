@@ -191,8 +191,7 @@ function resolveNextRewatchTag(records: Pick<AnimeListItem, "tags">[]) {
     }
   }
 
-  const baselineCount = Math.max(records.length, 1);
-  return formatRewatchTag(Math.max(2, highestCount + 1, baselineCount + 1));
+  return formatRewatchTag(Math.max(2, highestCount + 1));
 }
 
 function isCompletedAnimeRecord(record: Pick<AnimeListItem, "status" | "progress" | "totalEpisodes">) {
@@ -209,8 +208,7 @@ function shouldAutoResolveRewatch(
     return false;
   }
 
-  const hasReplaySignal = parsed.status === "completed" || parsed.episode !== undefined || parsed.progress !== undefined;
-  if (!hasReplaySignal) {
+  if (parsed.status === "plan_to_watch" || parsed.status === "dropped") {
     return false;
   }
 
@@ -219,6 +217,10 @@ function shouldAutoResolveRewatch(
   }
 
   const requestedProgress = parsed.progress ?? parsed.episode;
+  if (requestedProgress === undefined) {
+    return true;
+  }
+
   if (
     requestedProgress !== undefined
     && anime.totalEpisodes
@@ -294,6 +296,12 @@ function resolveCreateTitle(parsed: ParsedQuickRecordIntent, metadataTitle: stri
 
   const requestedSeason = getResolvedParsedSeason(parsed);
   if (!requestedSeason) {
+    const metadataSeason = extractSeasonNumber(normalizedMetadataTitle);
+    if (metadataSeason === 1) {
+      const strippedMetadataTitle = stripSeasonToken(normalizedMetadataTitle);
+      return strippedMetadataTitle || normalizedMetadataTitle;
+    }
+
     return normalizedMetadataTitle;
   }
 
@@ -301,7 +309,16 @@ function resolveCreateTitle(parsed: ParsedQuickRecordIntent, metadataTitle: stri
   const parsedBaseTitle = normalizeTitleToken(stripSeasonToken(parsed.animeTitle));
   const metadataBaseTitle = normalizeTitleToken(stripSeasonToken(normalizedMetadataTitle));
 
+  if (requestedSeason === 1 && parsedBaseTitle && metadataBaseTitle && parsedBaseTitle === metadataBaseTitle) {
+    const strippedMetadataTitle = stripSeasonToken(normalizedMetadataTitle);
+    return strippedMetadataTitle || normalizedMetadataTitle;
+  }
+
   if (metadataSeason === requestedSeason && parsedBaseTitle && metadataBaseTitle && parsedBaseTitle === metadataBaseTitle) {
+    return normalizedMetadataTitle;
+  }
+
+  if (/\p{Script=Han}/u.test(normalizedMetadataTitle)) {
     return normalizedMetadataTitle;
   }
 
@@ -399,6 +416,25 @@ function hasExplicitSeasonInRecord(record: Pick<ParsedQuickRecordIntent, "animeT
   );
 }
 
+function getParsedRecordSeason(record: Pick<ParsedQuickRecordIntent, "animeTitle" | "originalTitle" | "season">) {
+  return record.season ?? extractSeasonNumber(record.animeTitle) ?? extractSeasonNumber(record.originalTitle);
+}
+
+function realignRecordToExplicitSeason(
+  record: ParsedQuickRecordIntent,
+  explicitSeason: number,
+  fallbackBaseTitle: string,
+): ParsedQuickRecordIntent {
+  const baseTitle = stripSeasonToken(record.animeTitle) || stripSeasonToken(record.originalTitle) || fallbackBaseTitle || record.animeTitle;
+  return {
+    ...record,
+    season: explicitSeason,
+    titleKind: "generic-season",
+    animeTitle: appendSeasonToTitle(baseTitle, explicitSeason),
+    originalTitle: undefined,
+  };
+}
+
 function extractSeasonNumbersFromTextForTitle(inputText: string, animeTitle: string) {
   const baseTitle = stripSeasonToken(animeTitle);
   if (!baseTitle) {
@@ -480,6 +516,11 @@ function applyGlobalQuickRecordHints(inputText: string, batch: ParsedQuickRecord
       const [season] = explicitSeasons;
       expandedRecords.push(
         ...records.map((record): ParsedQuickRecordIntent => {
+          const recordSeason = getParsedRecordSeason(record);
+          if (recordSeason && recordSeason !== season) {
+            return realignRecordToExplicitSeason(record, season, baseTitle);
+          }
+
           if (hasExplicitSeasonInRecord(record)) {
             return record;
           }
@@ -686,6 +727,17 @@ async function fetchQuickRecordAiMetadata(queryName: string, settings: AiProvide
 }
 
 function buildQuickRecordProviderQueries(parsed: ParsedQuickRecordIntent, aiMetadata: QuickRecordAiMetadata | null) {
+  const requestedSeason = parsed.season ?? extractSeasonNumber(parsed.animeTitle) ?? extractSeasonNumber(parsed.originalTitle);
+  const isSeasonCompatible = (value: string | undefined) => {
+    const normalized = value?.trim();
+    if (!normalized || !requestedSeason) {
+      return Boolean(normalized);
+    }
+
+    const candidateSeason = extractSeasonNumber(normalized);
+    return candidateSeason === undefined || candidateSeason === requestedSeason;
+  };
+
   return Array.from(
     new Set(
       [
@@ -695,7 +747,7 @@ function buildQuickRecordProviderQueries(parsed: ParsedQuickRecordIntent, aiMeta
         parsed.animeTitle,
       ]
         .map((value) => value?.trim())
-        .filter((value): value is string => Boolean(value)),
+        .filter((value): value is string => Boolean(value) && isSeasonCompatible(value)),
     ),
   );
 }
@@ -784,7 +836,7 @@ function findMatchingAnime(items: AnimeListItem[], parsed: ParsedQuickRecordInte
 
   const exactMatch = exactMatches[0];
 
-  if (exactMatch) {
+  if (exactMatch && (!requestedSeason || getResolvedItemSeason(exactMatch) === undefined || getResolvedItemSeason(exactMatch) === requestedSeason)) {
     return exactMatch;
   }
 
@@ -840,6 +892,45 @@ function buildMetadataEnrichedFlag(parsed: ParsedQuickRecordIntent, detail: Anim
   );
 }
 
+function choosePreferredMetadataName(
+  parsed: Pick<ParsedQuickRecordIntent, "animeTitle" | "originalTitle" | "season">,
+  aiName: string | undefined,
+  providerName: string | undefined,
+) {
+  const normalizedAiName = toOptionalString(aiName);
+  if (!normalizedAiName) {
+    return toOptionalString(providerName);
+  }
+
+  const normalizedProviderName = toOptionalString(providerName);
+  if (!normalizedProviderName) {
+    return normalizedAiName;
+  }
+
+  const requestedSeason = getResolvedParsedSeason(parsed);
+  const aiBaseTitle = normalizeTitleToken(stripSeasonToken(normalizedAiName));
+  const providerBaseTitle = normalizeTitleToken(stripSeasonToken(normalizedProviderName));
+
+  if (!requestedSeason || !aiBaseTitle || !providerBaseTitle || aiBaseTitle !== providerBaseTitle) {
+    return normalizedProviderName;
+  }
+
+  const aiSeason = extractSeasonNumber(normalizedAiName);
+  const providerSeason = extractSeasonNumber(normalizedProviderName);
+  const aiLooksSeasonSpecific = aiSeason === requestedSeason;
+  const providerLooksSeasonSpecific = providerSeason === requestedSeason;
+
+  if (aiLooksSeasonSpecific && !providerLooksSeasonSpecific) {
+    return normalizedAiName;
+  }
+
+  if (aiLooksSeasonSpecific && providerSeason !== undefined && providerSeason !== requestedSeason) {
+    return normalizedAiName;
+  }
+
+  return normalizedProviderName;
+}
+
 async function enrichMetadata(parsed: ParsedQuickRecordIntent, settings: AiProviderSettings) {
   const queries = buildQuickRecordProviderQueries(parsed, null);
 
@@ -854,14 +945,14 @@ async function enrichMetadata(parsed: ParsedQuickRecordIntent, settings: AiProvi
         metadata: null,
         queries: providerQueries.length > 0 ? providerQueries : queries,
         candidates: providerResult.trace.flatMap((item) => item.candidates).slice(0, 4),
-        selectedTitle: providerResult.trace.find((item) => item.selected)?.selected?.title,
+        selectedTitle: providerResult.selected?.title,
       };
     }
 
     const merged: QuickRecordMetadata = {
       ...providerMetadata,
-      title: providerMetadata?.title || aiMetadata?.title,
-      originalTitle: providerMetadata?.originalTitle || aiMetadata?.originalTitle,
+      title: choosePreferredMetadataName(parsed, aiMetadata?.title, providerMetadata?.title),
+      originalTitle: choosePreferredMetadataName(parsed, aiMetadata?.originalTitle, providerMetadata?.originalTitle),
       totalEpisodes: providerMetadata?.totalEpisodes ?? aiMetadata?.totalEpisodes,
       durationMinutes: aiMetadata?.durationMinutes ?? providerMetadata?.durationMinutes,
       description: providerMetadata?.description || aiMetadata?.summary,
@@ -875,7 +966,7 @@ async function enrichMetadata(parsed: ParsedQuickRecordIntent, settings: AiProvi
       metadata: merged,
       queries: providerQueries.length > 0 ? providerQueries : queries,
       candidates: providerResult.trace.flatMap((item) => item.candidates).slice(0, 4),
-      selectedTitle: providerResult.trace.find((item) => item.selected)?.selected?.title || merged.title || merged.originalTitle,
+      selectedTitle: providerResult.selected?.title || merged.title || merged.originalTitle,
     };
   } catch {
     return {
@@ -939,7 +1030,7 @@ async function processCreateQuickRecord(
 
   const created = upsertAnimeItem(null, {
     title: resolveCreateTitle(parsed, metadata?.title),
-    originalTitle: parsed.originalTitle || metadata?.originalTitle,
+    originalTitle: metadata?.originalTitle || parsed.originalTitle,
     progress: 0,
     totalEpisodes: parsed.totalEpisodes || metadata?.totalEpisodes,
     status: parsed.status === "plan_to_watch" ? "plan_to_watch" : "watching",
@@ -991,12 +1082,13 @@ async function processCreateQuickRecord(
       watchedAt: recordedDateString,
       note: QUICK_RECORD_HISTORY_NOTE,
       forceHistory: shouldWriteHistory,
+      autoFillCompletionDate: false,
     });
     entry = loadAnimeDetailItem(entry.id) || entry;
   }
 
   if (resolvedStatus !== entry.status) {
-    entry = updateAnimeDetailItem(entry.id, { status: resolvedStatus }).entry;
+    entry = updateAnimeDetailItem(entry.id, { status: resolvedStatus, autoFillCompletionDate: false }).entry;
   }
 
   const metadataEnriched = buildMetadataEnrichedFlag(parsed, entry);
@@ -1077,7 +1169,7 @@ async function processUpdateQuickRecord(
   const mergedTags = mergeStringArrays(detail.tags, metadata?.tags, parsed.tags);
   const mergedCast = mergeStringArrays(detail.cast, metadata?.cast, parsed.cast);
   const patch = {
-    originalTitle: !detail.originalTitle ? (parsed.originalTitle || metadata?.originalTitle) : undefined,
+    originalTitle: !detail.originalTitle ? (metadata?.originalTitle || parsed.originalTitle) : undefined,
     score: (detail.score === undefined || detail.score <= 0) ? (parsed.score ?? metadata?.score) : undefined,
     totalEpisodes: !detail.totalEpisodes && effectiveTotalEpisodes ? effectiveTotalEpisodes : undefined,
     durationMinutes: detail.durationMinutes === undefined ? (parsed.durationMinutes ?? metadata?.durationMinutes) : undefined,
@@ -1106,6 +1198,7 @@ async function processUpdateQuickRecord(
       watchedAt: recordedDateString,
       note: QUICK_RECORD_HISTORY_NOTE,
       forceHistory,
+      autoFillCompletionDate: false,
     });
     detail = loadAnimeDetailItem(detail.id) || detail;
   }
@@ -1114,7 +1207,7 @@ async function processUpdateQuickRecord(
     ? (parsed.status || ((detail.totalEpisodes && targetProgress >= detail.totalEpisodes) ? "completed" : undefined))
     : undefined;
   if (resolvedStatus && resolvedStatus !== detail.status) {
-    detail = updateAnimeDetailItem(detail.id, { status: resolvedStatus }).entry;
+    detail = updateAnimeDetailItem(detail.id, { status: resolvedStatus, autoFillCompletionDate: false }).entry;
   }
 
   const metadataEnriched = buildMetadataEnrichedFlag(parsed, detail);

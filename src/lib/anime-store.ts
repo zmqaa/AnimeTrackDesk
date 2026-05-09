@@ -85,6 +85,7 @@ export interface AnimeDetailPatchInput {
   premiereDate?: string | null;
   cast?: string[];
   isFinished?: boolean;
+  autoFillCompletionDate?: boolean;
 }
 
 export interface AnimeProgressRecordInput {
@@ -94,6 +95,7 @@ export interface AnimeProgressRecordInput {
   watchedAt?: string;
   note?: string;
   forceHistory?: boolean;
+  autoFillCompletionDate?: boolean;
 }
 
 interface StoredAnimeEntry extends AnimeStorageEntry {}
@@ -1170,8 +1172,9 @@ export function updateAnimeDetailItem(id: number, input: AnimeDetailPatchInput) 
   const hasExplicitEndDate = input.endDate !== undefined;
   const rawEndDate = hasExplicitEndDate ? normalizeOptionalDate(input.endDate) : existingEntry.endDate;
   const completedNow = nextStatus === "completed" && previousStatus !== "completed";
+  const autoFillCompletionDate = input.autoFillCompletionDate !== false;
   const nextEndDate = nextStatus === "completed"
-    ? (hasExplicitEndDate ? rawEndDate : (completedNow ? (rawEndDate || getLocalTodayDateString(now)) : rawEndDate))
+    ? (hasExplicitEndDate ? rawEndDate : (completedNow && autoFillCompletionDate ? (rawEndDate || getLocalTodayDateString(now)) : rawEndDate))
     : rawEndDate;
 
   const nextEntry = normalizeStoredEntry({
@@ -1252,6 +1255,7 @@ export function recordAnimeProgress(input: AnimeProgressRecordInput) {
   const nextStatus = resolveStatusForProgress(mapStoredStatus(existingEntry.status), nextProgress, maxEpisodes);
   const completedNow = nextStatus === "completed" && mapStoredStatus(existingEntry.status) !== "completed";
   const shouldWriteHistory = (nextProgress > existingEntry.progress || Boolean(input.forceHistory)) && nextProgress > 0;
+  const autoFillCompletionDate = input.autoFillCompletionDate !== false;
 
   const nextEntry: StoredAnimeEntry = {
     ...existingEntry,
@@ -1260,7 +1264,9 @@ export function recordAnimeProgress(input: AnimeProgressRecordInput) {
     status: mapUiStatus(nextStatus),
     updatedAt: now,
     lastWatchedAt: shouldWriteHistory ? pickLaterTimestamp(existingEntry.lastWatchedAt, watchedAt) : existingEntry.lastWatchedAt,
-    endDate: nextStatus === "completed" ? existingEntry.endDate || getLocalTodayDateString(now) : existingEntry.endDate,
+    endDate: nextStatus === "completed"
+      ? (existingEntry.endDate || (autoFillCompletionDate ? getLocalTodayDateString(now) : undefined))
+      : existingEntry.endDate,
   };
 
   const nextEntries = entries.map((entry, index) => (index === entryIndex ? nextEntry : entry));

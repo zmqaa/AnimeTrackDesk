@@ -62,6 +62,17 @@ export function toChineseNumberToken(value: number): string {
 const SEASON_ZH_RE = /第\s*([0-9一二三四五六七八九十百零两〇]+)\s*[季期]/i;
 const SEASON_EN_RE = /\bseason\s*([0-9]{1,3})\b/i;
 const SEASON_S_RE  = /\bS\s*([0-9]{1,3})\b/i;
+const SEASON_EN_ORDINAL_RE = /\b([0-9]{1,3})(?:st|nd|rd|th)\s+season\b/i;
+const SEASON_NOTES_RE = /♪{2,}/u;
+
+function extractDecoratedSeasonNumber(text: string): number | undefined {
+  const notesMatch = text.match(SEASON_NOTES_RE)?.[0];
+  if (notesMatch && notesMatch.length >= 2) {
+    return notesMatch.length;
+  }
+
+  return undefined;
+}
 
 /** 从文本中提取季数（如 "第二季" → 2） */
 export function extractSeasonNumber(text: string | undefined | null): number | undefined {
@@ -75,8 +86,14 @@ export function extractSeasonNumber(text: string | undefined | null): number | u
   const seasonToken = normalized.match(SEASON_EN_RE)?.[1];
   if (seasonToken) return Number(seasonToken);
 
+  const ordinalToken = normalized.match(SEASON_EN_ORDINAL_RE)?.[1];
+  if (ordinalToken) return Number(ordinalToken);
+
   const sToken = normalized.match(SEASON_S_RE)?.[1];
   if (sToken) return Number(sToken);
+
+  const decoratedSeason = extractDecoratedSeasonNumber(normalized);
+  if (decoratedSeason) return decoratedSeason;
 
   return undefined;
 }
@@ -88,6 +105,7 @@ export function stripSeasonToken(text: string | undefined | null): string {
     .replace(/第\s*[0-9一二三四五六七八九十百零两〇]+\s*[季期]/gi, ' ')
     .replace(/\bseason\s*[0-9]{1,3}\b/gi, ' ')
     .replace(/\bS\s*[0-9]{1,3}\b/g, ' ')
+    .replace(/♪{2,}/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }

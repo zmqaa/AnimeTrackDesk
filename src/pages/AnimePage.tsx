@@ -39,6 +39,27 @@ function parseFilterStatus(value: string | null): AnimeStatus | "all" {
   return "all";
 }
 
+function parseSortBy(value: string | null): AnimeSortBy {
+  if (
+    value === "lastWatchedAt"
+    || value === "updatedAt"
+    || value === "createdAt"
+    || value === "startDate"
+    || value === "endDate"
+    || value === "score"
+    || value === "progress"
+    || value === "title"
+  ) {
+    return value;
+  }
+
+  return "lastWatchedAt";
+}
+
+function parseSortOrder(value: string | null): "asc" | "desc" {
+  return value === "asc" ? "asc" : "desc";
+}
+
 export default function AnimePage() {
   const [items, setItems] = useState<AnimeListItem[]>(() => loadAnimeListItems());
   const [showForm, setShowForm] = useState(false);
@@ -48,9 +69,6 @@ export default function AnimePage() {
   const [quickLoading, setQuickLoading] = useState(false);
   const [quickMessage, setQuickMessage] = useState("");
   const [quickTrace, setQuickTrace] = useState<QuickRecordTraceEvent[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<AnimeSortBy>("lastWatchedAt");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; title: string } | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window !== "undefined") {
@@ -71,16 +89,22 @@ export default function AnimePage() {
   }, [searchParams]);
 
   const filterStatus = useMemo(() => parseFilterStatus(searchParams.get("status")), [searchParams]);
+  const searchQuery = useMemo(() => searchParams.get("q")?.trim() || "", [searchParams]);
   const castQuery = useMemo(() => searchParams.get("cast")?.trim() || "", [searchParams]);
   const tagFilter = useMemo(() => searchParams.get("tag")?.trim() || "", [searchParams]);
+  const sortBy = useMemo(() => parseSortBy(searchParams.get("sortBy")), [searchParams]);
+  const sortOrder = useMemo(() => parseSortOrder(searchParams.get("sortOrder")), [searchParams]);
   const detailReturnTo = location.search ? `${location.pathname}${location.search}` : location.pathname;
   const pageSize = 12;
 
   const updateSearchState = useCallback((updates: {
     page?: number | null;
     status?: AnimeStatus | "all" | null;
+    q?: string | null;
     cast?: string | null;
     tag?: string | null;
+    sortBy?: AnimeSortBy | null;
+    sortOrder?: "asc" | "desc" | null;
   }) => {
     const nextParams = new URLSearchParams(searchParams);
 
@@ -97,6 +121,15 @@ export default function AnimePage() {
         nextParams.delete("status");
       } else {
         nextParams.set("status", updates.status);
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, "q")) {
+      const normalizedQuery = updates.q?.trim();
+      if (!normalizedQuery) {
+        nextParams.delete("q");
+      } else {
+        nextParams.set("q", normalizedQuery);
       }
     }
 
@@ -118,6 +151,22 @@ export default function AnimePage() {
       }
     }
 
+    if (Object.prototype.hasOwnProperty.call(updates, "sortBy")) {
+      if (!updates.sortBy || updates.sortBy === "lastWatchedAt") {
+        nextParams.delete("sortBy");
+      } else {
+        nextParams.set("sortBy", updates.sortBy);
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, "sortOrder")) {
+      if (!updates.sortOrder || updates.sortOrder === "desc") {
+        nextParams.delete("sortOrder");
+      } else {
+        nextParams.set("sortOrder", updates.sortOrder);
+      }
+    }
+
     setSearchParams(nextParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
@@ -129,12 +178,24 @@ export default function AnimePage() {
     updateSearchState({ status, page: 1 });
   }, [updateSearchState]);
 
+  const setSearchQuery = useCallback((value: string) => {
+    updateSearchState({ q: value, page: 1 });
+  }, [updateSearchState]);
+
   const setCastQuery = useCallback((value: string) => {
     updateSearchState({ cast: value, page: 1 });
   }, [updateSearchState]);
 
   const setTagFilter = useCallback((value: string) => {
     updateSearchState({ tag: value, page: 1 });
+  }, [updateSearchState]);
+
+  const setSortBy = useCallback((value: AnimeSortBy) => {
+    updateSearchState({ sortBy: value, page: 1 });
+  }, [updateSearchState]);
+
+  const setSortOrder = useCallback((value: "asc" | "desc") => {
+    updateSearchState({ sortOrder: value, page: 1 });
   }, [updateSearchState]);
 
   useEffect(() => {
