@@ -38,9 +38,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: DEFAULT_THEME,
   ai: {
     enabled: false,
-    provider: "OpenAI Compatible",
-    baseUrl: "https://api.openai.com/v1",
-    model: "gpt-4.1-mini",
+    provider: "DeepSeek",
+    baseUrl: "https://api.deepseek.com",
+    model: "deepseek-v4-flash",
     apiKey: "",
   },
   updatedAt: null,

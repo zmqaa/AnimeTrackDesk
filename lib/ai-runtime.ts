@@ -20,7 +20,7 @@ export type RequestAiJsonOptions = Partial<AiRuntimeConfig> & {
 };
 
 export const DEFAULT_AI_URL = 'https://api.deepseek.com/chat/completions';
-export const DEFAULT_AI_MODEL = 'deepseek-chat';
+export const DEFAULT_AI_MODEL = 'deepseek-v4-flash';
 
 export function normalizeAiApiUrl(value?: string) {
   const normalized = String(value || '').trim();

@@ -22,6 +22,7 @@ type AiProviderPreset = {
   provider: string;
   baseUrl: string;
   defaultModel: string;
+  models?: { value: string; label: string; description: string }[];
 };
 
 type AiConnectionState = {
@@ -37,18 +38,24 @@ type ThemeOption = {
   preview: string;
 };
 
+const DEEPSEEK_MODELS = [
+  { value: "deepseek-v4-flash", label: "DeepSeek V4 Flash", description: "轻量快速，适合日常补全、快速录入（推荐）" },
+  { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro", description: "旗舰模型，更精准但稍慢，适合复杂补全" },
+];
+
 const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
+  {
+    label: "DeepSeek",
+    provider: "DeepSeek",
+    baseUrl: "https://api.deepseek.com",
+    defaultModel: "deepseek-v4-flash",
+    models: DEEPSEEK_MODELS,
+  },
   {
     label: "OpenAI",
     provider: "OpenAI Compatible",
     baseUrl: "https://api.openai.com/v1",
     defaultModel: "gpt-4.1-mini",
-  },
-  {
-    label: "DeepSeek",
-    provider: "DeepSeek",
-    baseUrl: "https://api.deepseek.com/v1",
-    defaultModel: "deepseek-chat",
   },
   {
     label: "OpenRouter",
@@ -341,13 +348,18 @@ export default function SettingsPage() {
       ...current,
       provider: preset.provider,
       baseUrl: preset.baseUrl,
-      model: current.model.trim() ? current.model : preset.defaultModel,
+      model: current.baseUrl === preset.baseUrl && current.model.trim() ? current.model : preset.defaultModel,
     }));
   }, [updateAiDraft]);
 
   const isRuntimeReady = !loadingRuntime && runtimeInfo !== null;
   const aiStatusLabel = getAiStatusLabel(settings.ai, aiConnectionState);
   const hasAiDraftChanges = useMemo(() => !areAiSettingsEqual(aiDraft, settings.ai), [aiDraft, settings.ai]);
+  const activePreset = useMemo(
+    () => AI_PROVIDER_PRESETS.find((preset) => aiDraft.baseUrl === preset.baseUrl),
+    [aiDraft.baseUrl],
+  );
+  const showModelSelector = Boolean(activePreset?.models?.length);
   const selectedThemeLabel = getThemeLabel(themes, settings.theme);
   const isAiActionDisabled = isSaving || isTestingAi;
 
@@ -529,21 +541,44 @@ export default function SettingsPage() {
                     provider: event.target.value,
                   }))}
                   className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-100 outline-none transition focus:border-white/20"
-                  placeholder="例如：OpenAI Compatible"
+                  placeholder="例如：DeepSeek"
                 />
               </label>
 
               <label className="space-y-2">
-                <span className="text-sm text-zinc-300">模型名</span>
-                <input
-                  value={aiDraft.model}
-                  onChange={(event) => updateAiDraft((current) => ({
-                    ...current,
-                    model: event.target.value,
-                  }))}
-                  className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-100 outline-none transition focus:border-white/20"
-                  placeholder="例如：gpt-4.1-mini"
-                />
+                <span className="text-sm text-zinc-300">模型</span>
+                {showModelSelector ? (
+                  <div className="grid gap-2">
+                    {activePreset!.models!.map((m) => (
+                      <button
+                        key={m.value}
+                        type="button"
+                        onClick={() => updateAiDraft((current) => ({
+                          ...current,
+                          model: m.value,
+                        }))}
+                        className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
+                          aiDraft.model === m.value
+                            ? "theme-accent-soft border-white/20 text-zinc-100"
+                            : "border-white/10 bg-black/20 text-zinc-400 hover:border-white/15 hover:text-zinc-200"
+                        }`}
+                      >
+                        <div className="font-medium text-zinc-100">{m.label}</div>
+                        <div className="mt-0.5 text-xs text-zinc-500">{m.description}</div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <input
+                    value={aiDraft.model}
+                    onChange={(event) => updateAiDraft((current) => ({
+                      ...current,
+                      model: event.target.value,
+                    }))}
+                    className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-100 outline-none transition focus:border-white/20"
+                    placeholder="例如：gpt-4.1-mini"
+                  />
+                )}
               </label>
 
               <label className="space-y-2 lg:col-span-2">
@@ -555,7 +590,7 @@ export default function SettingsPage() {
                     baseUrl: event.target.value,
                   }))}
                   className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-100 outline-none transition focus:border-white/20"
-                  placeholder="https://api.openai.com/v1"
+                  placeholder="https://api.deepseek.com"
                 />
               </label>
 

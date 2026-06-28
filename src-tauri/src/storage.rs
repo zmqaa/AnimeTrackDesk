@@ -8,9 +8,9 @@ use serde::{Deserialize, Serialize};
 const SCHEMA_VERSION: i64 = 2;
 const DEFAULT_DISPLAY_NAME: &str = "动漫记录";
 const DEFAULT_THEME: &str = "obsidian";
-const DEFAULT_AI_PROVIDER: &str = "OpenAI Compatible";
-const DEFAULT_AI_BASE_URL: &str = "https://api.openai.com/v1";
-const DEFAULT_AI_MODEL: &str = "gpt-4.1-mini";
+const DEFAULT_AI_PROVIDER: &str = "DeepSeek";
+const DEFAULT_AI_BASE_URL: &str = "https://api.deepseek.com";
+const DEFAULT_AI_MODEL: &str = "deepseek-v4-flash";
 const MAX_BACKUP_RECORDS: usize = 12;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
